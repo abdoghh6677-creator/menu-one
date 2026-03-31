@@ -64,7 +64,7 @@ DROP TABLE IF EXISTS staff_permissions CASCADE;
 CREATE TABLE staff_permissions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
 
     -- صلاحيات أساسية
