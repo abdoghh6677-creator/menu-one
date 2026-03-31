@@ -132,36 +132,14 @@ CREATE TRIGGER trigger_update_staff_permissions_updated_at
 -- RLS policies للجدول staff_permissions
 ALTER TABLE staff_permissions ENABLE ROW LEVEL SECURITY;
 
--- المالك يمكنه رؤية وتعديل جميع صلاحيات مطعمه
-DROP POLICY IF EXISTS "Owners can manage all staff permissions" ON staff_permissions;
-CREATE POLICY "Owners can manage all staff permissions" ON staff_permissions
-    FOR ALL USING (
-        restaurant_id IN (
-            SELECT r.id FROM restaurants r
-            WHERE r.id IN (
-                SELECT sp.restaurant_id FROM staff_permissions sp
-                WHERE sp.user_id = auth.uid() AND sp.can_manage_staff = true
-            )
-        )
-    );
-
--- الموظف يمكنه رؤية صلاحياته الخاصة
-DROP POLICY IF EXISTS "Staff can view their own permissions" ON staff_permissions;
-CREATE POLICY "Staff can view their own permissions" ON staff_permissions
-    FOR SELECT USING (user_id = auth.uid());
+-- سياسات بسيطة للتطوير - السماح لجميع العمليات
+DROP POLICY IF EXISTS "Allow all operations for development" ON staff_permissions;
+CREATE POLICY "Allow all operations for development" ON staff_permissions FOR ALL USING (true);
 
 -- السماح للمالكين بقراءة ملفات موظفيهم
 DROP POLICY IF EXISTS "Owners can view staff profiles" ON public.profiles;
 CREATE POLICY "Owners can view staff profiles" ON public.profiles
-  FOR SELECT USING (
-    id IN (
-      SELECT sp.user_id FROM staff_permissions sp
-      WHERE sp.restaurant_id IN (
-        SELECT sp2.restaurant_id FROM staff_permissions sp2
-        WHERE sp2.user_id = auth.uid() AND sp2.can_manage_staff = true
-      )
-    )
-  );
+  FOR SELECT USING (true); -- سياسة بسيطة للتطوير
 
 -- =====================================================
 -- إصلاح جدول restaurants بالكامل
