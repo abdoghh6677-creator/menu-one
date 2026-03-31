@@ -218,15 +218,17 @@ export const playNotificationBeep = async (): Promise<void> => {
       gain.connect(ctx.destination);
       osc.frequency.value = freq;
       osc.type = "sine";
-      gain.gain.setValueAtTime(0.4, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0.8, ctx.currentTime + start); // زيادة الصوت
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
       osc.start(ctx.currentTime + start);
       osc.stop(ctx.currentTime + start + duration);
     };
-    // 3 نغمات متصاعدة لطلب جديد
-    playBeep(440, 0, 0.2);
-    playBeep(550, 0.25, 0.2);
-    playBeep(660, 0.5, 0.3);
+    // 5 نغمات متصاعدة لطلب جديد - أقوى وأطول
+    playBeep(440, 0, 0.3);
+    playBeep(550, 0.35, 0.3);
+    playBeep(660, 0.7, 0.3);
+    playBeep(880, 1.05, 0.4);
+    playBeep(1100, 1.45, 0.5);
   } catch {
     // تجاهل لو المتصفح لا يدعمه
   }

@@ -13,7 +13,7 @@ import Inventory from "./Inventory";
 import ManualOrder from "./ManualOrder";
 import { getSession, clearSession, renewSession, getSessionExpiry } from "../../utils/session";
 import { subscribeToOrders } from "../../services/restaurantService";
-import { playNotificationBeep, notifyNewOrder } from "../../utils/notifications";
+import { playNotificationBeep, notifyNewOrder, requestNotificationPermission } from "../../utils/notifications";
 
 const WARNING_MINUTES = 5; // تحذير 5 دقائق قبل الانتهاء
 
@@ -41,6 +41,9 @@ const RestaurantDashboard: React.FC = () => {
       return;
     }
     setUser(userData);
+
+    // طلب إذن الإشعارات
+    requestNotificationPermission();
 
     const checkSession = setInterval(() => {
       const session = getSession();
@@ -97,6 +100,10 @@ const RestaurantDashboard: React.FC = () => {
         newPendingOrders.forEach((order) => {
           notifyNewOrder(order.order_number, order.order_type);
         });
+        // تنبيه بصري في المتصفح كـ fallback
+        if (document.hidden) {
+          alert(`🔔 طلب جديد! وصل ${newPendingOrders.length} طلب جديد - تحقق من لوحة التحكم`);
+        }
         // إشعار بصري في لوحة التحكم
         setNewOrderNotification(`وصل ${newPendingOrders.length} طلب جديد!`);
         // إخفاء الإشعار بعد 5 ثوانٍ

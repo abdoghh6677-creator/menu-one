@@ -84,7 +84,7 @@ export const fetchStaff = async (restaurantId: string): Promise<StaffMember[]> =
     .from("users")
     .select("id, email, full_name, role, is_active, temp_password, created_at")
     .eq("restaurant_id", restaurantId)
-    .eq("role", "staff")
+    .neq("role", "owner")
     .order("created_at", { ascending: false });
 
   if (error || !users) return [];
@@ -109,12 +109,10 @@ export const createStaff = async (
   fullName: string,
   rolePreset: "manager" | "cashier" | "staff"
 ): Promise<{ success: boolean; error?: string }> => {
-  const passwordHash = btoa(password); // same hashing as rest of app
-
   const { data, error } = await supabase.rpc("create_staff_user", {
     p_restaurant_id: restaurantId,
     p_email: email.toLowerCase(),
-    p_password_hash: passwordHash,
+    p_password_hash: password, // send plain password, function will hash it
     p_full_name: fullName,
     p_role: rolePreset,
   });
@@ -154,9 +152,10 @@ export const deleteStaff = async (userId: string) => {
 
 // تحديث كلمة مرور موظف
 export const resetStaffPassword = async (userId: string, newPassword: string) => {
-  const { error } = await supabase.from("users")
-    .update({ password_hash: btoa(newPassword), temp_password: true })
-    .eq("id", userId);
+  const { error } = await supabase.rpc("reset_staff_password", {
+    p_user_id: userId,
+    p_new_password: newPassword,
+  });
   return !error;
 };
 

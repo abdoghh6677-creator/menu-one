@@ -547,6 +547,84 @@ CREATE POLICY "Allow all operations for development" ON staff_permissions FOR AL
 GRANT EXECUTE ON FUNCTION auto_create_restaurant(text, text, text, text, text, text, text, text, text, text) TO anon;
 GRANT EXECUTE ON FUNCTION restaurant_login(text, text) TO anon;
 
+-- دالة إنشاء موظف جديد
+CREATE OR REPLACE FUNCTION create_staff_user(
+  p_restaurant_id UUID,
+  p_email         TEXT,
+  p_password_hash TEXT,
+  p_full_name     TEXT,
+  p_role          TEXT DEFAULT 'staff'
+) RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_id UUID;
+BEGIN
+  -- التحقق من عدم وجود بريد إلكتروني مكرر
+  IF EXISTS (SELECT 1 FROM users WHERE email = LOWER(p_email)) THEN
+    RAISE EXCEPTION 'البريد الإلكتروني مستخدم بالفعل';
+  END IF;
+
+  -- إنشاء حساب الموظف
+  INSERT INTO users (restaurant_id, email, password_hash, full_name, role, temp_password, is_active, created_at, updated_at)
+  VALUES (p_restaurant_id, LOWER(p_email), crypt(p_password_hash, gen_salt('bf', 8)), p_full_name, p_role, true, true, NOW(), NOW())
+  RETURNING id INTO v_id;
+
+  -- إنشاء صلاحيات افتراضية حسب الدور
+  INSERT INTO staff_permissions (restaurant_id, user_id, role,
+    can_view_orders, can_accept_orders, can_reject_orders, can_complete_orders, can_edit_orders, can_create_manual_order,
+    can_view_menu, can_edit_menu, can_add_menu_items, can_delete_menu_items,
+    can_view_inventory, can_edit_inventory,
+    can_view_reports, can_export_data,
+    can_view_promotions, can_manage_promotions,
+    can_view_settings, can_edit_settings, can_manage_staff)
+  VALUES (p_restaurant_id, v_id, p_role,
+    -- طلبات
+    true, -- can_view_orders
+    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_accept_orders
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_reject_orders
+    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_complete_orders
+    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_edit_orders
+    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_create_manual_order
+    -- منيو
+    true, -- can_view_menu
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_edit_menu
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_add_menu_items
+    false, -- can_delete_menu_items (لا يحذف أحد)
+    -- مخزون
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_inventory
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_edit_inventory
+    -- تقارير
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_reports
+    false, -- can_export_data
+    -- عروض
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_promotions
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_manage_promotions
+    -- إعدادات
+    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_settings
+    false, -- can_edit_settings
+    false -- can_manage_staff
+  );
+
+  RETURN v_id;
+END; $$;
+
+GRANT EXECUTE ON FUNCTION create_staff_user(uuid, text, text, text, text) TO anon;
+
+-- دالة إعادة تعيين كلمة مرور موظف
+CREATE OR REPLACE FUNCTION reset_staff_password(
+  p_user_id UUID,
+  p_new_password TEXT
+) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE users
+  SET password_hash = crypt(p_new_password, gen_salt('bf', 8)),
+      temp_password = true,
+      updated_at = NOW()
+  WHERE id = p_user_id;
+
+  RETURN FOUND;
+END; $$;
+
+GRANT EXECUTE ON FUNCTION reset_staff_password(uuid, text) TO anon;
+
 -- دالة للتحديث التلقائي لـ updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
