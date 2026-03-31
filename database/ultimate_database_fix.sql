@@ -260,7 +260,7 @@ UPDATE users SET
     password_hash = COALESCE(password_hash, 'temp_hash'),
     temp_password = COALESCE(temp_password, TRUE),
     role = CASE
-        WHEN role NOT IN ('owner', 'staff', 'admin') OR role IS NULL
+        WHEN role NOT IN ('owner', 'manager', 'cashier', 'staff', 'admin') OR role IS NULL
         THEN 'owner'
         ELSE role
     END,
@@ -272,7 +272,7 @@ WHERE email IS NULL
    OR password_hash IS NULL
    OR temp_password IS NULL
    OR role IS NULL
-   OR role NOT IN ('owner', 'staff', 'admin')
+   OR role NOT IN ('owner', 'manager', 'cashier', 'staff', 'admin')
    OR is_active IS NULL
    OR created_at IS NULL
    OR updated_at IS NULL
@@ -281,7 +281,7 @@ WHERE email IS NULL
 -- إضافة القيود
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
-    CHECK (role IN ('owner', 'staff', 'admin'));
+    CHECK (role IN ('owner', 'manager', 'cashier', 'staff', 'admin'));
 
 -- إضافة الفهارس
 CREATE INDEX IF NOT EXISTS idx_users_restaurant_id ON users(restaurant_id);
