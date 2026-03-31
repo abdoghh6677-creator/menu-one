@@ -130,11 +130,10 @@ CREATE TRIGGER trigger_update_staff_permissions_updated_at
     EXECUTE FUNCTION update_staff_permissions_updated_at();
 
 -- RLS policies للجدول staff_permissions
-ALTER TABLE staff_permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_permissions DISABLE ROW LEVEL SECURITY;
 
--- سياسات بسيطة للتطوير - السماح لجميع العمليات
-DROP POLICY IF EXISTS "Allow all operations for development" ON staff_permissions;
-CREATE POLICY "Allow all operations for development" ON staff_permissions FOR ALL USING (true);
+-- تعطيل RLS للتطوير لتجنب مشاكل الصلاحيات
+-- سيتم تفعيلها لاحقاً في بيئة الإنتاج
 
 -- السماح للمالكين بقراءة ملفات موظفيهم
 DROP POLICY IF EXISTS "Owners can view staff profiles" ON public.profiles;
@@ -513,21 +512,13 @@ $$;
 -- إعداد الأمان الأساسي
 -- =====================================================
 
--- Row Level Security
-ALTER TABLE registration_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE restaurants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- Row Level Security - معطل للتطوير
+ALTER TABLE registration_requests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE restaurants DISABLE ROW LEVEL SECURITY;
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 
--- سياسات أمان بسيطة للتطوير (يمكن تخصيصها لاحقاً)
-DROP POLICY IF EXISTS "Allow all operations for development" ON registration_requests;
-DROP POLICY IF EXISTS "Allow all operations for development" ON restaurants;
-DROP POLICY IF EXISTS "Allow all operations for development" ON users;
-DROP POLICY IF EXISTS "Allow all operations for development" ON staff_permissions;
-
-CREATE POLICY "Allow all operations for development" ON registration_requests FOR ALL USING (true);
-CREATE POLICY "Allow all operations for development" ON restaurants FOR ALL USING (true);
-CREATE POLICY "Allow all operations for development" ON users FOR ALL USING (true);
-CREATE POLICY "Allow all operations for development" ON staff_permissions FOR ALL USING (true);
+-- تعطيل جميع السياسات للتطوير لتجنب مشاكل التكرار اللانهائي
+-- سيتم تفعيلها لاحقاً في بيئة الإنتاج
 
 -- السماح بتنفيذ الدوال للتطوير
 GRANT EXECUTE ON FUNCTION auto_create_restaurant(text, text, text, text, text, text, text, text, text, text) TO anon;
