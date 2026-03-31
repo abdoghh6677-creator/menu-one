@@ -1,6 +1,5 @@
 import { supabase } from "../config/supabase";
 import type { Order, MenuItem } from "../config/supabase";
-import type { StaffPermissions } from "../utils/session";
 
 /**
  * Restaurant API Service

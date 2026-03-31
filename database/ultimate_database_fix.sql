@@ -55,90 +55,17 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- =====================================================
--- إنشاء جدول staff_permissions لصلاحيات الموظفين
+-- إزالة نظام الموظفين بالكامل
+-- Removing Staff System Completely
 -- =====================================================
 
--- حذف الجدول إذا كان موجوداً لإعادة إنشائه بالكامل
+-- حذف جدول صلاحيات الموظفين
 DROP TABLE IF EXISTS staff_permissions CASCADE;
 
-CREATE TABLE staff_permissions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email TEXT NOT NULL,
-
-    -- صلاحيات أساسية
-    can_view_orders BOOLEAN DEFAULT true,
-    can_accept_orders BOOLEAN DEFAULT false,
-    can_reject_orders BOOLEAN DEFAULT false,
-    can_complete_orders BOOLEAN DEFAULT false,
-    can_edit_orders BOOLEAN DEFAULT false,
-    can_create_manual_order BOOLEAN DEFAULT false,
-
-    -- صلاحيات المنيو
-    can_view_menu BOOLEAN DEFAULT true,
-    can_edit_menu BOOLEAN DEFAULT false,
-    can_add_menu_items BOOLEAN DEFAULT false,
-    can_delete_menu_items BOOLEAN DEFAULT false,
-
-    -- صلاحيات المخزون
-    can_view_inventory BOOLEAN DEFAULT false,
-    can_edit_inventory BOOLEAN DEFAULT false,
-
-    -- صلاحيات التقارير
-    can_view_reports BOOLEAN DEFAULT false,
-    can_export_data BOOLEAN DEFAULT false,
-
-    -- صلاحيات العروض
-    can_view_promotions BOOLEAN DEFAULT false,
-    can_manage_promotions BOOLEAN DEFAULT false,
-
-    -- صلاحيات الإعدادات
-    can_view_settings BOOLEAN DEFAULT false,
-    can_edit_settings BOOLEAN DEFAULT false,
-
-    -- صلاحيات الموظفين (للمالك فقط)
-    can_manage_staff BOOLEAN DEFAULT false,
-
-    -- الدور
-    role TEXT DEFAULT 'staff' CHECK (role IN ('owner', 'manager', 'cashier', 'staff')),
-
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-    UNIQUE(restaurant_id, user_id)
-);
-
--- إنشاء فهارس
-CREATE INDEX IF NOT EXISTS idx_staff_permissions_restaurant_id ON staff_permissions(restaurant_id);
-CREATE INDEX IF NOT EXISTS idx_staff_permissions_user_id ON staff_permissions(user_id);
-
--- دالة لتحديث updated_at
-CREATE OR REPLACE FUNCTION update_staff_permissions_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- trigger للتحديث التلقائي
-DROP TRIGGER IF EXISTS trigger_update_staff_permissions_updated_at ON staff_permissions;
-CREATE TRIGGER trigger_update_staff_permissions_updated_at
-    BEFORE UPDATE ON staff_permissions
-    FOR EACH ROW
-    EXECUTE FUNCTION update_staff_permissions_updated_at();
-
--- RLS policies للجدول staff_permissions
-ALTER TABLE staff_permissions DISABLE ROW LEVEL SECURITY;
-
--- تعطيل RLS للتطوير لتجنب مشاكل الصلاحيات
--- سيتم تفعيلها لاحقاً في بيئة الإنتاج
-
--- السماح للمالكين بقراءة ملفات موظفيهم
-DROP POLICY IF EXISTS "Owners can view staff profiles" ON public.profiles;
-CREATE POLICY "Owners can view staff profiles" ON public.profiles
-  FOR SELECT USING (true); -- سياسة بسيطة للتطوير
+-- حذف دوال الموظفين
+DROP FUNCTION IF EXISTS create_staff_user(uuid, text, text, text, text);
+DROP FUNCTION IF EXISTS reset_staff_password(uuid, text);
+DROP FUNCTION IF EXISTS update_staff_permissions_updated_at();
 
 -- =====================================================
 -- إصلاح جدول restaurants بالكامل
@@ -245,7 +172,7 @@ UPDATE users SET
     password_hash = COALESCE(password_hash, 'temp_hash'),
     temp_password = COALESCE(temp_password, TRUE),
     role = CASE
-        WHEN role NOT IN ('owner', 'manager', 'cashier', 'staff', 'admin') OR role IS NULL
+        WHEN role NOT IN ('owner', 'admin') OR role IS NULL
         THEN 'owner'
         ELSE role
     END,
@@ -257,7 +184,7 @@ WHERE email IS NULL
    OR password_hash IS NULL
    OR temp_password IS NULL
    OR role IS NULL
-   OR role NOT IN ('owner', 'manager', 'cashier', 'staff', 'admin')
+   OR role NOT IN ('owner', 'admin')
    OR is_active IS NULL
    OR created_at IS NULL
    OR updated_at IS NULL
@@ -266,7 +193,7 @@ WHERE email IS NULL
 -- إضافة القيود
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
-    CHECK (role IN ('owner', 'manager', 'cashier', 'staff', 'admin'));
+    CHECK (role IN ('owner', 'admin'));
 
 -- إضافة الفهارس
 CREATE INDEX IF NOT EXISTS idx_users_restaurant_id ON users(restaurant_id);
@@ -523,84 +450,6 @@ ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 -- السماح بتنفيذ الدوال للتطوير
 GRANT EXECUTE ON FUNCTION auto_create_restaurant(text, text, text, text, text, text, text, text, text, text) TO anon;
 GRANT EXECUTE ON FUNCTION restaurant_login(text, text) TO anon;
-
--- دالة إنشاء موظف جديد
-CREATE OR REPLACE FUNCTION create_staff_user(
-  p_restaurant_id UUID,
-  p_email         TEXT,
-  p_password_hash TEXT,
-  p_full_name     TEXT,
-  p_role          TEXT DEFAULT 'staff'
-) RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_id UUID;
-BEGIN
-  -- التحقق من عدم وجود بريد إلكتروني مكرر
-  IF EXISTS (SELECT 1 FROM users WHERE email = LOWER(p_email)) THEN
-    RAISE EXCEPTION 'البريد الإلكتروني مستخدم بالفعل';
-  END IF;
-
-  -- إنشاء حساب الموظف
-  INSERT INTO users (restaurant_id, email, password_hash, full_name, role, temp_password, is_active, created_at, updated_at)
-  VALUES (p_restaurant_id, LOWER(p_email), crypt(p_password_hash, gen_salt('bf', 8)), p_full_name, p_role, true, true, NOW(), NOW())
-  RETURNING id INTO v_id;
-
-  -- إنشاء صلاحيات افتراضية حسب الدور
-  INSERT INTO staff_permissions (restaurant_id, user_id, email, role,
-    can_view_orders, can_accept_orders, can_reject_orders, can_complete_orders, can_edit_orders, can_create_manual_order,
-    can_view_menu, can_edit_menu, can_add_menu_items, can_delete_menu_items,
-    can_view_inventory, can_edit_inventory,
-    can_view_reports, can_export_data,
-    can_view_promotions, can_manage_promotions,
-    can_view_settings, can_edit_settings, can_manage_staff)
-  VALUES (p_restaurant_id, v_id, LOWER(p_email), p_role,
-    -- طلبات
-    true, -- can_view_orders
-    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_accept_orders
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_reject_orders
-    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_complete_orders
-    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_edit_orders
-    CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_create_manual_order
-    -- منيو
-    true, -- can_view_menu
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_edit_menu
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_add_menu_items
-    false, -- can_delete_menu_items (لا يحذف أحد)
-    -- مخزون
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_inventory
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_edit_inventory
-    -- تقارير
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_reports
-    false, -- can_export_data
-    -- عروض
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_promotions
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_manage_promotions
-    -- إعدادات
-    CASE WHEN p_role = 'manager' THEN true ELSE false END, -- can_view_settings
-    false, -- can_edit_settings
-    false -- can_manage_staff
-  );
-
-  RETURN v_id;
-END; $$;
-
-GRANT EXECUTE ON FUNCTION create_staff_user(uuid, text, text, text, text) TO anon;
-
--- دالة إعادة تعيين كلمة مرور موظف
-CREATE OR REPLACE FUNCTION reset_staff_password(
-  p_user_id UUID,
-  p_new_password TEXT
-) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  UPDATE users
-  SET password_hash = crypt(p_new_password, gen_salt('bf', 8)),
-      temp_password = true,
-      updated_at = NOW()
-  WHERE id = p_user_id;
-
-  RETURN FOUND;
-END; $$;
-
-GRANT EXECUTE ON FUNCTION reset_staff_password(uuid, text) TO anon;
 
 -- دالة للتحديث التلقائي لـ updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

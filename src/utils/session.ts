@@ -9,7 +9,7 @@ const SESSION_DURATION_HOURS = 8; // 8 ساعات
 export interface SessionUser {
   id: string;
   email: string;
-  role: string;
+  role: 'owner' | 'admin';
   restaurant_id: string;
   restaurant: {
     name: string;
@@ -17,30 +17,6 @@ export interface SessionUser {
     is_active: boolean;
   };
   temp_password: boolean;
-  permissions?: StaffPermissions;
-}
-
-export interface StaffPermissions {
-  role: 'owner' | 'manager' | 'cashier' | 'staff';
-  can_view_orders: boolean;
-  can_accept_orders: boolean;
-  can_reject_orders: boolean;
-  can_complete_orders: boolean;
-  can_edit_orders: boolean;
-  can_create_manual_order: boolean;
-  can_view_menu: boolean;
-  can_edit_menu: boolean;
-  can_add_menu_items: boolean;
-  can_delete_menu_items: boolean;
-  can_view_inventory: boolean;
-  can_edit_inventory: boolean;
-  can_view_reports: boolean;
-  can_export_data: boolean;
-  can_view_promotions: boolean;
-  can_manage_promotions: boolean;
-  can_view_settings: boolean;
-  can_edit_settings: boolean;
-  can_manage_staff: boolean;
 }
 
 /** حفظ جلسة جديدة */

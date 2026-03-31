@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, Routes, Route, Link, useLocation } from "react-router-dom";
-import { Store as StoreIcon, LogOut, LayoutDashboard, ShoppingBag, UtensilsCrossed, FileText, Settings, Tag, AlertTriangle, KeyRound, Users, Boxes, ClipboardList } from "lucide-react";
+import { Store as StoreIcon, LogOut, LayoutDashboard, ShoppingBag, UtensilsCrossed, FileText, Settings, Tag, AlertTriangle, KeyRound, Boxes, ClipboardList } from "lucide-react";
 import RestaurantHome from "./RestaurantHome";
 import Orders from "./Orders";
 import Menu from "./Menu";
@@ -8,7 +8,6 @@ import Reports from "./Reports";
 import RestaurantSettings from "./RestaurantSettings";
 import Promotions from "./Promotions";
 import ChangePassword from "./ChangePassword";
-import Staff from "./Staff";
 import Inventory from "./Inventory";
 import ManualOrder from "./ManualOrder";
 import { getSession, clearSession, renewSession, getSessionExpiry } from "../../utils/session";
@@ -129,7 +128,6 @@ const RestaurantDashboard: React.FC = () => {
     { path: "/restaurant/inventory", icon: Boxes, label: "المخزون" },
     { path: "/restaurant/reports", icon: FileText, label: "التقارير" },
     { path: "/restaurant/promotions", icon: Tag, label: "العروض" },
-    { path: "/restaurant/staff", icon: Users, label: "الموظفون" },
     { path: "/restaurant/settings", icon: Settings, label: "الإعدادات" },
   ];
 
@@ -274,7 +272,6 @@ const RestaurantDashboard: React.FC = () => {
           <Route path="inventory" element={<Inventory />} />
           <Route path="reports" element={<Reports />} />
           <Route path="promotions" element={<Promotions />} />
-          <Route path="staff" element={<Staff />} />
           <Route path="settings" element={<RestaurantSettings />} />
           <Route path="change-password" element={<ChangePassword />} />
         </Routes>
