@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS staff_permissions (
 ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff' CHECK (role IN ('owner', 'manager', 'staff'));
 
 -- إضافة الأعمدة المفقودة للصلاحيات
+ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_edit_orders BOOLEAN DEFAULT false;
 ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_create_manual_order BOOLEAN DEFAULT false;
 ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_view_inventory BOOLEAN DEFAULT false;
 ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_edit_inventory BOOLEAN DEFAULT false;
