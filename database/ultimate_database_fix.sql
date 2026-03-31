@@ -576,14 +576,14 @@ BEGIN
   RETURNING id INTO v_id;
 
   -- إنشاء صلاحيات افتراضية حسب الدور
-  INSERT INTO staff_permissions (restaurant_id, user_id, role,
+  INSERT INTO staff_permissions (restaurant_id, user_id, email, role,
     can_view_orders, can_accept_orders, can_reject_orders, can_complete_orders, can_edit_orders, can_create_manual_order,
     can_view_menu, can_edit_menu, can_add_menu_items, can_delete_menu_items,
     can_view_inventory, can_edit_inventory,
     can_view_reports, can_export_data,
     can_view_promotions, can_manage_promotions,
     can_view_settings, can_edit_settings, can_manage_staff)
-  VALUES (p_restaurant_id, v_id, p_role,
+  VALUES (p_restaurant_id, v_id, LOWER(p_email), p_role,
     -- طلبات
     true, -- can_view_orders
     CASE WHEN p_role IN ('manager','cashier') THEN true ELSE false END, -- can_accept_orders
