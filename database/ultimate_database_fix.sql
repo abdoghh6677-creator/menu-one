@@ -58,7 +58,10 @@ CREATE TRIGGER on_auth_user_created
 -- إنشاء جدول staff_permissions لصلاحيات الموظفين
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS staff_permissions (
+-- حذف الجدول إذا كان موجوداً لإعادة إنشائه بالكامل
+DROP TABLE IF EXISTS staff_permissions CASCADE;
+
+CREATE TABLE staff_permissions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -70,12 +73,17 @@ CREATE TABLE IF NOT EXISTS staff_permissions (
     can_reject_orders BOOLEAN DEFAULT false,
     can_complete_orders BOOLEAN DEFAULT false,
     can_edit_orders BOOLEAN DEFAULT false,
+    can_create_manual_order BOOLEAN DEFAULT false,
 
     -- صلاحيات المنيو
     can_view_menu BOOLEAN DEFAULT true,
     can_edit_menu BOOLEAN DEFAULT false,
     can_add_menu_items BOOLEAN DEFAULT false,
     can_delete_menu_items BOOLEAN DEFAULT false,
+
+    -- صلاحيات المخزون
+    can_view_inventory BOOLEAN DEFAULT false,
+    can_edit_inventory BOOLEAN DEFAULT false,
 
     -- صلاحيات التقارير
     can_view_reports BOOLEAN DEFAULT false,
@@ -92,20 +100,14 @@ CREATE TABLE IF NOT EXISTS staff_permissions (
     -- صلاحيات الموظفين (للمالك فقط)
     can_manage_staff BOOLEAN DEFAULT false,
 
+    -- الدور
+    role TEXT DEFAULT 'staff' CHECK (role IN ('owner', 'manager', 'cashier', 'staff')),
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     UNIQUE(restaurant_id, user_id)
 );
-
--- إضافة عمود role للمستخدمين
-ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff' CHECK (role IN ('owner', 'manager', 'staff'));
-
--- إضافة الأعمدة المفقودة للصلاحيات
-ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_edit_orders BOOLEAN DEFAULT false;
-ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_create_manual_order BOOLEAN DEFAULT false;
-ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_view_inventory BOOLEAN DEFAULT false;
-ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS can_edit_inventory BOOLEAN DEFAULT false;
 
 -- إنشاء فهارس
 CREATE INDEX IF NOT EXISTS idx_staff_permissions_restaurant_id ON staff_permissions(restaurant_id);
