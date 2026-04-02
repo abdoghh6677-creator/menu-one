@@ -39,6 +39,12 @@ export const buildImageUrl = (
   quality = 75
 ): string => {
   if (!originalUrl) return originalUrl;
+
+  // إذا الرابط لا يبدأ بـ http، افترض أنه اسم ملف من Cloudinary
+  if (!originalUrl.startsWith('http')) {
+    originalUrl = `${import.meta.env.VITE_CLOUDINARY_BASE_URL}/${originalUrl}`;
+  }
+
   try {
     const url = new URL(originalUrl);
     // إذا الرابط من Cloudinary (يحتوي res.cloudinary.com)
