@@ -32,7 +32,7 @@ const compressImage = (file: File, maxWidth = 900, quality = 0.78): Promise<File
     img.src = objectUrl;
   });
 
-// ─── بناء رابط مع Cloudinary Transformations ────────────────────────────────
+// ─── بناء رابط مع Transformations ────────────────────────────────
 export const buildImageUrl = (
   originalUrl: string,
   width = 600,
@@ -86,6 +86,7 @@ export const uploadMenuImage = async (file: File): Promise<string | null> => {
     }
 
     const data = JSON.parse(responseText);
+    // Return the full secure URL from Cloudinary
     return data.secure_url;
   } catch (error) {
     console.error("Upload error:", error);

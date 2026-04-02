@@ -671,7 +671,7 @@ const CustomerMenu: React.FC = () => {
                 <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                   {item.image_url ? (
                     <LazyImage
-                      src={item.image_url}
+                      src={item.image_url?.startsWith('http') ? item.image_url : `${import.meta.env.VITE_CLOUDINARY_BASE_URL}/${item.image_url}`}
                       alt={getItemName(item, lang)}
                       width={380}
                       quality={65}
@@ -871,7 +871,7 @@ const ItemCustomizationModal: React.FC<{
       <div className="space-y-5" dir={lang === "ar" ? "rtl" : "ltr"}>
         {item.image_url && (
           <LazyImage
-            src={item.image_url}
+            src={item.image_url?.startsWith('http') ? item.image_url : `${import.meta.env.VITE_CLOUDFLARE_CDN_URL}/${item.image_url}`}
             alt={getItemName(item, lang)}
             width={600}
             quality={80}
@@ -1006,7 +1006,7 @@ const RecommendationsModal: React.FC<{
             <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
               {item.image_url && (
                 <LazyImage
-                  src={item.image_url}
+                  src={item.image_url?.startsWith('http') ? item.image_url : `${import.meta.env.VITE_CLOUDFLARE_CDN_URL}/${item.image_url}`}
                   alt={getItemName(item, lang)}
                   width={128}
                   quality={70}

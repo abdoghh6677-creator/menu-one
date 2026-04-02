@@ -98,7 +98,11 @@ const PromotionPopup: React.FC<PromotionPopupProps> = ({ promotions, lang }) => 
           {/* Promo Image */}
           <div className="relative w-full" style={{ aspectRatio: "9/16", maxHeight: "70vh" }}>
             <img
-              src={currentPromo.image_url}
+              src={
+                currentPromo.image_url?.startsWith('http') 
+                  ? currentPromo.image_url 
+                  : `https://res.cloudinary.com/dpjxle26o/image/upload/${currentPromo.image_url}`
+              }
               alt={title}
               className="w-full h-full object-cover"
             />

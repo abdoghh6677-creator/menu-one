@@ -330,7 +330,7 @@ const Menu: React.FC = () => {
               <div className="flex flex-col lg:flex-row gap-4">
                 {item.image_url && (
                   <LazyImage
-                    src={item.image_url}
+                    src={item.image_url?.startsWith('http') ? item.image_url : `${import.meta.env.VITE_CLOUDINARY_BASE_URL}/${item.image_url}`}
                     alt={item.name_ar || item.name}
                     width={256}
                     quality={80}

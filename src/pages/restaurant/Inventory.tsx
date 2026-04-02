@@ -79,7 +79,11 @@ const SimpleStockTab: React.FC<{ restaurantId: string; userId: string }> = ({ re
             <Card key={item.id} className={isOut ? "border-red-200 bg-red-50/30" : isLow ? "border-amber-200 bg-amber-50/30" : ""}>
               <div className="flex items-center gap-4">
                 {item.image_url ? (
-                  <img src={item.image_url} alt={item.name_ar || item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                  <img src={
+                    item.image_url?.startsWith('http') 
+                      ? item.image_url 
+                      : `https://res.cloudinary.com/dpjxle26o/image/upload/${item.image_url}`
+                  } alt={item.name_ar || item.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
                 ) : (
                   <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                     <Package className="w-6 h-6 text-gray-300" />

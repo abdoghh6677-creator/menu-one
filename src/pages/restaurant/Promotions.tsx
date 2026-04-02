@@ -150,7 +150,11 @@ const Promotions: React.FC = () => {
                   {/* Promo Image */}
                   <div className="relative w-full sm:w-32 h-40 sm:h-32 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                     {promo.image_url ? (
-                      <img src={promo.image_url} alt={promo.title_ar || promo.title} className="w-full h-full object-cover" />
+                      <img src={
+                        promo.image_url?.startsWith('http') 
+                          ? promo.image_url 
+                          : `https://res.cloudinary.com/dpjxle26o/image/upload/${promo.image_url}`
+                      } alt={promo.title_ar || promo.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Package className="w-10 h-10 text-gray-300" />
