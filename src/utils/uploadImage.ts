@@ -49,11 +49,8 @@ export const buildImageUrl = (
     const url = new URL(originalUrl);
     // إذا الرابط من Cloudinary (يحتوي res.cloudinary.com)
     if (url.hostname === "res.cloudinary.com") {
-      // أضف transformations تلقائية: f_auto,q_auto,w_{width}
-      const pathParts = url.pathname.split("/upload/");
-      if (pathParts.length === 2) {
-        return `${url.origin}/upload/f_auto,q_auto,w_${width}/${pathParts[1]}`;
-      }
+      // لا نضيف transformations للروابط من Cloudinary - نرجعها كما هي
+      return originalUrl;
     }
     // إذا الرابط من Supabase (روابط قديمة) - أرجعه كما هو
     if (url.pathname.includes("/storage/v1/object/public/")) {
