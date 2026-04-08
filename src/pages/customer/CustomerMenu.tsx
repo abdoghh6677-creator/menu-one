@@ -383,10 +383,13 @@ const CustomerMenu: React.FC = () => {
       registerServiceWorker(restaurant.slug);
 
       // Load active promotions
-      getActivePromotions(restaurant.id).then(setPromotions);
+      getActivePromotions(restaurant.id).then(setPromotions).catch(() => {
+        console.error("Failed to load promotions");
+      });
 
       // Subscribe to menu
       const sub = subscribeToMenuItems(restaurant.id, (data) => {
+        console.log("Menu items loaded:", data.length);
         setMenuItems(data);
         setLoading(false);
       });
@@ -454,7 +457,9 @@ const CustomerMenu: React.FC = () => {
   };
 
   const orderTypesEnabled = restaurant?.order_types_enabled || { dine_in: true, takeaway: true, delivery: false };
-  const categories = ["all", ...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))];
+  const [dbCategories, setDbCategories] = useState<{ ar: string; en: string }[]>([]);
+  useEffect(() => { if (restaurant?.id) { supabase.from("menu_categories").select("name, description").eq("restaurant_id", restaurant.id).eq("is_active", true).order("display_order", { ascending: true }).then(({ data }) => setDbCategories((data || []).map((c: any) => ({ ar: c.name, en: c.description || c.name })))); } }, [restaurant?.id]);
+  const categoriesList = ["all", ...(dbCategories.length > 0 ? dbCategories.map(c => lang === "ar" ? c.ar : c.en) : [...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))])];
   const filteredItems = menuItems.filter((item) => {
     const name = getItemName(item, lang);
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -644,7 +649,7 @@ const CustomerMenu: React.FC = () => {
       <div className="bg-white border-b sticky top-[116px] z-30">
         <div className="max-w-screen-lg mx-auto px-4">
           <div className="flex gap-2 overflow-x-auto py-2 scrollbar-hide">
-            {categories.map((category) => (
+            {categoriesList.map((category) => (
               <button key={category} onClick={() => setCategoryFilter(category || "all")}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   categoryFilter === category ? "bg-accent text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
