@@ -463,8 +463,10 @@ const CustomerMenu: React.FC = () => {
   const filteredItems = menuItems.filter((item) => {
     const name = getItemName(item, lang);
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-    const itemCat = lang === "ar" ? (item.category_ar || item.category || "") : (item.category || item.category_ar || "");
-    const matchesCategory = categoryFilter === "all" || itemCat === categoryFilter;
+    const normalizedFilter = categoryFilter.trim().toLowerCase();
+    const itemCategoryAr = item.category_ar?.trim().toLowerCase() || "";
+    const itemCategoryEn = item.category?.trim().toLowerCase() || "";
+    const matchesCategory = categoryFilter === "all" || [itemCategoryAr, itemCategoryEn].includes(normalizedFilter);
     return matchesSearch && matchesCategory && item.is_available;
   });
 
