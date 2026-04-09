@@ -459,14 +459,36 @@ const CustomerMenu: React.FC = () => {
   const orderTypesEnabled = restaurant?.order_types_enabled || { dine_in: true, takeaway: true, delivery: false };
   const [dbCategories, setDbCategories] = useState<{ name: string; description: string }[]>([]);
   useEffect(() => { if (restaurant?.id) { supabase.from("menu_categories").select("name, description").eq("restaurant_id", restaurant.id).eq("is_active", true).order("display_order", { ascending: true }).then(({ data }) => setDbCategories((data || []).map((c: any) => ({ name: c.name, description: c.description })))); } }, [restaurant?.id]);
-  const categoriesList = ["all", ...(dbCategories.length > 0 ? dbCategories.map(c => lang === "ar" ? c.name : (c.description || c.name)) : [...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))])];
+  
+  // Build categories list with either dbCategories or fallback to menuItems
+  const categoriesList = dbCategories.length > 0 
+    ? ["all", ...dbCategories.map(c => lang === "ar" ? c.name : (c.description || c.name))]
+    : ["all", ...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))];
+  
+  // Filter items with proper category matching
   const filteredItems = menuItems.filter((item) => {
     const name = getItemName(item, lang);
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-    const normalizedFilter = categoryFilter.trim().toLowerCase();
-    const itemCategoryAr = item.category_ar?.trim().toLowerCase() || "";
-    const itemCategoryEn = item.category?.trim().toLowerCase() || "";
-    const matchesCategory = categoryFilter === "all" || [itemCategoryAr, itemCategoryEn].includes(normalizedFilter);
+    
+    let matchesCategory = false;
+    if (categoryFilter === "all") {
+      matchesCategory = true;
+    } else if (dbCategories.length > 0) {
+      // Find the selected category from dbCategories
+      const selectedDbCategory = dbCategories.find(cat => 
+        (lang === "ar" ? cat.name : (cat.description || cat.name)) === categoryFilter
+      );
+      // Match item against category name (Arabic) and description (English)
+      if (selectedDbCategory) {
+        matchesCategory = item.category_ar === selectedDbCategory.name || 
+                         item.category === selectedDbCategory.description;
+      }
+    } else {
+      // Fallback to direct comparison
+      const itemCat = lang === "ar" ? (item.category_ar || item.category || "") : (item.category || item.category_ar || "");
+      matchesCategory = itemCat === categoryFilter;
+    }
+    
     return matchesSearch && matchesCategory && item.is_available;
   });
 
