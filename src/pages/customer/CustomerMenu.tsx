@@ -459,11 +459,11 @@ const CustomerMenu: React.FC = () => {
   const orderTypesEnabled = restaurant?.order_types_enabled || { dine_in: true, takeaway: true, delivery: false };
   const [dbCategories, setDbCategories] = useState<{ name: string; description: string }[]>([]);
   useEffect(() => { if (restaurant?.id) { supabase.from("menu_categories").select("name, description").eq("restaurant_id", restaurant.id).eq("is_active", true).order("display_order", { ascending: true }).then(({ data }) => setDbCategories((data || []).map((c: any) => ({ name: c.name, description: c.description })))); } }, [restaurant?.id]);
-  const categoriesList = ["all", ...(dbCategories.length > 0 ? dbCategories.map(c => lang === "ar" ? c.name : c.description) : [...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))])];
+  const categoriesList = ["all", ...(dbCategories.length > 0 ? dbCategories.map(c => lang === "ar" ? c.name : (c.description || c.name)) : [...new Set(menuItems.map((item) => getCategoryName(item, lang)).filter(Boolean))])];
   const filteredItems = menuItems.filter((item) => {
     const name = getItemName(item, lang);
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-    const itemCat = lang === "ar" ? item.category_ar : item.category;
+    const itemCat = lang === "ar" ? (item.category_ar || item.category || "") : (item.category || item.category_ar || "");
     const matchesCategory = categoryFilter === "all" || itemCat === categoryFilter;
     return matchesSearch && matchesCategory && item.is_available;
   });
