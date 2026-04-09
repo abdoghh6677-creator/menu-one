@@ -627,7 +627,7 @@ const CustomerMenu: React.FC = () => {
                 </button>
               )}
               {/* Language Toggle */}
-              <button onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+              <button onClick={() => { setLang(lang === "ar" ? "en" : "ar"); setCategoryFilter("all"); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                 <Globe className="w-4 h-4" />
                 <span className="font-medium">{lang === "ar" ? "EN" : "ع"}</span>
