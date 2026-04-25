@@ -4,6 +4,7 @@
 
 // Shared AudioContext for all beep functions
 let sharedAudioContext: AudioContext | null = null;
+let loopedBeepInterval: any = null;
 
 const getAudioContext = (): AudioContext => {
   if (!sharedAudioContext) {
@@ -134,6 +135,11 @@ export const sendOrderViaWhatsApp = (order: any, restaurantName?: string, whatsa
     rejected: "مرفوض",
   };
 
+  const paymentLabels: Record<string, string> = {
+    cash: "نقداً 💵",
+    instapay: "إنستا باي 📱",
+  };
+
   let message = `🔔 *طلب جديد - إشعار للمطعم*\n\n`;
   message += `🏪 *المطعم:* ${restaurantName || "مطعمنا"}\n`;
   message += `📋 *رقم الطلب:* #${order.order_number}\n`;
@@ -159,19 +165,26 @@ export const sendOrderViaWhatsApp = (order: any, restaurantName?: string, whatsa
     message += `📞 *هاتف العميل:* ${order.customer_phone}\n`;
   }
 
+  if (order.payment_method) {
+    message += `💳 *طريقة الدفع:* ${paymentLabels[order.payment_method] || order.payment_method}\n`;
+  }
+
   message += `📊 *الحالة:* ${statusLabels[order.status] || order.status}\n\n`;
 
   message += `🛒 *الأصناف المطلوبة:*\n`;
   if (order.items && Array.isArray(order.items)) {
     order.items.forEach((item: any, index: number) => {
-      message += `${index + 1}. ${item.name}`;
+      const itemName = item.name_ar || item.name;
+      message += `${index + 1}. ${itemName}`;
       if (item.selected_size) {
-        message += ` (${item.selected_size.name})`;
+        const sizeName = item.selected_size.name_ar || item.selected_size.name;
+        message += ` (${sizeName})`;
       }
-      message += ` - ${item.quantity}×${item.item_total} ج.م\n`;
+      message += ` - ${item.quantity}×${item.item_total || item.base_price} ج.م\n`;
 
       if (item.selected_addons && item.selected_addons.length > 0) {
-        message += `   إضافات: ${item.selected_addons.map((a: any) => a.name).join(", ")}\n`;
+        const addons = item.selected_addons.map((a: any) => a.name_ar || a.name).join("، ");
+        message += `   إضافات: ${addons}\n`;
       }
     });
   }
@@ -218,12 +231,12 @@ export const playNotificationBeep = async (): Promise<void> => {
       gain.connect(ctx.destination);
       osc.frequency.value = freq;
       osc.type = "sine";
-      gain.gain.setValueAtTime(0.8, ctx.currentTime + start); // زيادة الصوت
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + start); // صوت متوسط
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
       osc.start(ctx.currentTime + start);
       osc.stop(ctx.currentTime + start + duration);
     };
-    // 5 نغمات متصاعدة لطلب جديد - أقوى وأطول
+    // 5 نغمات متصاعدة لطلب جديد
     playBeep(440, 0, 0.3);
     playBeep(550, 0.35, 0.3);
     playBeep(660, 0.7, 0.3);
@@ -231,6 +244,23 @@ export const playNotificationBeep = async (): Promise<void> => {
     playBeep(1100, 1.45, 0.5);
   } catch {
     // تجاهل لو المتصفح لا يدعمه
+  }
+};
+
+/** بدء تكرار صوت التنبيه */
+export const startNotificationLoop = () => {
+  if (loopedBeepInterval) return;
+  playNotificationBeep();
+  loopedBeepInterval = setInterval(() => {
+    playNotificationBeep();
+  }, 4000); // تكرار كل 4 ثوانٍ
+};
+
+/** إيقاف تكرار صوت التنبيه */
+export const stopNotificationLoop = () => {
+  if (loopedBeepInterval) {
+    clearInterval(loopedBeepInterval);
+    loopedBeepInterval = null;
   }
 };
 

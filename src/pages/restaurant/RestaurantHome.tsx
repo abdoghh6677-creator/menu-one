@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ShoppingBag, UtensilsCrossed, DollarSign, Clock, TrendingUp, Users, Star, Timer } from "lucide-react";
+import { ShoppingBag, Utensils, DollarSign, Clock, TrendingUp, Users, Star, Timer } from "lucide-react";
 import { Card, Loading } from "../../components/ui";
 import { getRestaurantStats } from "../../services/restaurantService";
 import { formatCurrency } from "../../utils/helpers";
@@ -26,7 +26,7 @@ const RestaurantHome: React.FC = () => {
     { title: "الطلبات المعلقة", value: stats?.pendingOrders || 0, icon: Clock, color: "text-warning", bgColor: "bg-warning/10" },
     { title: "طلبات اليوم", value: stats?.completedToday || 0, icon: ShoppingBag, color: "text-accent", bgColor: "bg-accent/10" },
     { title: "إيرادات اليوم", value: formatCurrency(stats?.revenueToday || 0), icon: DollarSign, color: "text-success", bgColor: "bg-success/10" },
-    { title: "إجمالي الطلبات", value: stats?.totalOrders || 0, icon: UtensilsCrossed, color: "text-accent-secondary", bgColor: "bg-accent-secondary/10" },
+    { title: "إجمالي الطلبات", value: stats?.totalOrders || 0, icon: Utensils, color: "text-accent-secondary", bgColor: "bg-accent-secondary/10" },
     { title: "متوسط قيمة الطلب", value: formatCurrency(stats?.avgOrderValue || 0), icon: TrendingUp, color: "text-purple-600", bgColor: "bg-purple-100" },
     { title: "إيرادات الأسبوع", value: formatCurrency(stats?.revenueWeek || 0), icon: DollarSign, color: "text-blue-600", bgColor: "bg-blue-100" },
     { title: "معدل الاحتفاظ", value: `${Math.round(stats?.customerRetention || 0)}%`, icon: Users, color: "text-green-600", bgColor: "bg-green-100" },
@@ -167,7 +167,7 @@ const RestaurantHome: React.FC = () => {
             <p className="text-sm text-text-secondary">إدارة الطلبات الواردة</p>
           </a>
           <a href="/restaurant/menu" className="p-4 border border-border rounded-lg hover:border-accent hover:bg-accent/5 transition-colors text-center">
-            <UtensilsCrossed className="w-8 h-8 text-accent mx-auto mb-2" />
+            <Utensils className="w-8 h-8 text-accent mx-auto mb-2" />
             <p className="font-medium text-text">إدارة المنيو</p>
             <p className="text-sm text-text-secondary">تحديث الأصناف والأسعار</p>
           </a>

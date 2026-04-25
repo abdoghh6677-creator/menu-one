@@ -79,12 +79,13 @@ export const deleteCategory = async (
   categoryId: string,
   categoryName: string
 ): Promise<{ success: boolean; error?: any }> => {
-  // نحدّث الأصناف التابعة لهذا التصنيف لتفريغ category_ar
+  // نحدّث الأصناف التابعة لهذا التصنيف لتفريغ category و category_ar
+  // نستخدم OR condition للبحث في كلا الحقلين
   await supabase
     .from("menu_items")
     .update({ category: null, category_ar: null })
     .eq("restaurant_id", restaurantId)
-    .eq("category_ar", categoryName);
+    .or(`category.eq.${categoryName},category_ar.eq.${categoryName}`);
 
   const { error } = await supabase
     .from("menu_categories")

@@ -16,15 +16,25 @@ export const injectDynamicManifest = (restaurant: {
   if (existing) existing.remove();
 
   const themeColor = restaurant.theme_color || '#f97316';
-  const iconUrl = restaurant.logo_url || '/icons/icon-192.png';
+  
+  // Create optimized icons if it's a Cloudinary URL
+  const getIconUrl = (size: number) => {
+    if (!restaurant.logo_url) return `/icons/icon-${size}.png`;
+    if (restaurant.logo_url.includes('res.cloudinary.com')) {
+      // Use Cloudinary transformation for exact size
+      return restaurant.logo_url.replace('/upload/', `/upload/w_${size},h_${size},c_fill,g_auto,f_png/`);
+    }
+    return restaurant.logo_url;
+  };
+
   const startUrl = `/menu/${restaurant.slug}`;
 
   const manifest = {
     name: restaurant.name,
-    short_name: restaurant.name.length > 12 ? restaurant.name.substring(0, 12) : restaurant.name,
+    short_name: restaurant.name.substring(0, 12),
     description: `اطلب من ${restaurant.name} بسهولة`,
     start_url: startUrl,
-    scope: startUrl,
+    scope: '/',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: themeColor,
@@ -34,28 +44,16 @@ export const injectDynamicManifest = (restaurant: {
     categories: ['food', 'shopping'],
     icons: [
       {
-        src: iconUrl,
+        src: getIconUrl(192),
         sizes: '192x192',
-        type: restaurant.logo_url ? 'image/jpeg' : 'image/png',
+        type: 'image/png',
         purpose: 'any',
       },
       {
-        src: iconUrl,
+        src: getIconUrl(512),
         sizes: '512x512',
-        type: restaurant.logo_url ? 'image/jpeg' : 'image/png',
+        type: 'image/png',
         purpose: 'maskable',
-      },
-      {
-        src: '/icons/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
-      {
-        src: '/icons/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any maskable',
       },
     ],
   };
@@ -80,10 +78,10 @@ export const injectDynamicManifest = (restaurant: {
   themeTag.content = themeColor;
 
   // حدّث apple-mobile-web-app meta tags
-  setAppleMeta(restaurant.name, themeColor);
+  setAppleMeta(restaurant.name, themeColor, getIconUrl(192));
 };
 
-const setAppleMeta = (name: string, themeColor: string) => {
+const setAppleMeta = (name: string, themeColor: string, iconUrl: string) => {
   const setMeta = (name: string, content: string) => {
     let tag = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
     if (!tag) {
@@ -100,6 +98,15 @@ const setAppleMeta = (name: string, themeColor: string) => {
   setMeta('mobile-web-app-capable', 'yes');
   setMeta('application-name', name);
   setMeta('msapplication-TileColor', themeColor);
+
+  // Apple Touch Icon
+  let appleIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement;
+  if (!appleIcon) {
+    appleIcon = document.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    document.head.appendChild(appleIcon);
+  }
+  appleIcon.href = iconUrl;
 };
 
 /**
@@ -161,4 +168,12 @@ export const isPWAInstallAvailable = (): boolean => !!deferredPrompt;
 export const isPWAInstalled = (): boolean => {
   return window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as any).standalone === true;
+};
+
+export const isIOS = (): boolean => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+};
+
+export const isInStandaloneMode = (): boolean => {
+  return ('standalone' in window.navigator) && ((window.navigator as any).standalone);
 };

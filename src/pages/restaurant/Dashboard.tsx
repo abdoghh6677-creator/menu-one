@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, Routes, Route, Link, useLocation } from "react-router-dom";
-import { Store as StoreIcon, LogOut, LayoutDashboard, ShoppingBag, UtensilsCrossed, FileText, Settings, Tag, AlertTriangle, KeyRound, Boxes, ClipboardList } from "lucide-react";
+import { Store as StoreIcon, LogOut, LayoutDashboard, ShoppingBag, Utensils, FileText, Settings, Tag, AlertTriangle, KeyRound, Boxes, ClipboardList, MapPin } from "lucide-react";
 import RestaurantHome from "./RestaurantHome";
 import Orders from "./Orders";
 import Menu from "./Menu";
@@ -10,9 +10,11 @@ import Promotions from "./Promotions";
 import ChangePassword from "./ChangePassword";
 import Inventory from "./Inventory";
 import ManualOrder from "./ManualOrder";
+import DeliveryZones from "./DeliveryZones";
+import Reservations from "./Reservations";
 import { getSession, clearSession, renewSession, getSessionExpiry } from "../../utils/session";
 import { subscribeToOrders } from "../../services/restaurantService";
-import { playNotificationBeep, notifyNewOrder, requestNotificationPermission } from "../../utils/notifications";
+import { playNotificationBeep, notifyNewOrder, requestNotificationPermission, startNotificationLoop, stopNotificationLoop } from "../../utils/notifications";
 
 const WARNING_MINUTES = 5; // تحذير 5 دقائق قبل الانتهاء
 
@@ -26,6 +28,7 @@ const RestaurantDashboard: React.FC = () => {
   const [newOrderNotification, setNewOrderNotification] = useState<string | null>(null);
   const prevOrderCountRef = useRef(0);
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
+  const [unconfirmedOrders, setUnconfirmedOrders] = useState<Set<string>>(new Set());
 
   const handleLogout = useCallback(() => {
     clearSession();
@@ -93,8 +96,14 @@ const RestaurantDashboard: React.FC = () => {
 
       if (newPendingOrders.length > 0 && prevOrderIdsRef.current.size > 0) {
         console.log('New orders detected:', newPendingOrders);
-        // صوت الإشعار
-        playNotificationBeep();
+        
+        // تتبع الطلبات غير المؤكدة لبدء التكرار الصوتي
+        setUnconfirmedOrders(prev => {
+          const next = new Set(prev);
+          newPendingOrders.forEach(o => next.add(o.id));
+          return next;
+        });
+
         // Push notification لكل طلب جديد
         newPendingOrders.forEach((order) => {
           notifyNewOrder(order.order_number, order.order_type);
@@ -105,18 +114,42 @@ const RestaurantDashboard: React.FC = () => {
         }
         // إشعار بصري في لوحة التحكم
         setNewOrderNotification(`وصل ${newPendingOrders.length} طلب جديد!`);
-        // إخفاء الإشعار بعد 5 ثوانٍ
-        setTimeout(() => setNewOrderNotification(null), 5000);
       }
 
       // تحديث قائمة الـ IDs المعروفة
       prevOrderIdsRef.current = new Set(orders.map((o) => o.id));
+
+      // تنظيف الطلبات غير المؤكدة التي تغيرت حالتها أو حذفت
+      setUnconfirmedOrders(prev => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        let changed = false;
+        next.forEach(id => {
+          const order = orders.find(o => o.id === id);
+          if (!order || order.status !== "pending") {
+            next.delete(id);
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
     });
 
     return () => {
       subscription.unsubscribe();
+      stopNotificationLoop();
     };
   }, [user?.restaurant_id]);
+
+  // التحكم في تكرار الصوت
+  useEffect(() => {
+    if (unconfirmedOrders.size > 0) {
+      startNotificationLoop();
+    } else {
+      stopNotificationLoop();
+    }
+    return () => stopNotificationLoop();
+  }, [unconfirmedOrders.size]);
 
   if (!user) return null;
 
@@ -124,10 +157,12 @@ const RestaurantDashboard: React.FC = () => {
     { path: "/restaurant", icon: LayoutDashboard, label: "الرئيسية" },
     { path: "/restaurant/orders", icon: ShoppingBag, label: "الطلبات" },
     { path: "/restaurant/manual-order", icon: ClipboardList, label: "طلب يدوي" },
-    { path: "/restaurant/menu", icon: UtensilsCrossed, label: "المنيو" },
+    { path: "/restaurant/menu", icon: Utensils, label: "المنيو" },
     { path: "/restaurant/inventory", icon: Boxes, label: "المخزون" },
     { path: "/restaurant/reports", icon: FileText, label: "التقارير" },
     { path: "/restaurant/promotions", icon: Tag, label: "العروض" },
+    { path: "/restaurant/delivery-zones", icon: MapPin, label: "مناطق التوصيل" },
+    { path: "/restaurant/reservations", icon: Utensils, label: "الحجوزات" },
     { path: "/restaurant/settings", icon: Settings, label: "الإعدادات" },
   ];
 
@@ -151,14 +186,30 @@ const RestaurantDashboard: React.FC = () => {
 
       {/* إشعار الطلبات الجديدة */}
       {newOrderNotification && (
-        <div className="fixed top-16 left-4 right-4 z-40 bg-accent text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between gap-3 animate-bounce">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm font-semibold">{newOrderNotification}</span>
+        <div className="fixed top-16 left-4 right-4 z-40 bg-accent text-white px-4 py-4 rounded-xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 animate-bounce border-2 border-white/20 backdrop-blur-sm bg-accent/90">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+              <ShoppingBag className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-lg font-bold leading-none">{newOrderNotification}</p>
+              <p className="text-sm text-white/80 mt-1">يُرجى مراجعة وتأكيد الطلبات الجديدة</p>
+            </div>
           </div>
-          <button onClick={() => setNewOrderNotification(null)} className="text-white/80 hover:text-white">
-            ✕
-          </button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button 
+              onClick={() => {
+                setUnconfirmedOrders(new Set());
+                setNewOrderNotification(null);
+              }} 
+              className="flex-1 md:flex-none bg-white text-accent px-6 py-2 rounded-lg font-bold hover:bg-white/90 transition-colors shadow-lg"
+            >
+              تأكيد الاستلام (إيقاف الصوت)
+            </button>
+            <button onClick={() => setNewOrderNotification(null)} className="text-white/60 hover:text-white p-2">
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -170,7 +221,7 @@ const RestaurantDashboard: React.FC = () => {
             <div className="flex items-center">
               <StoreIcon className="w-8 h-8 text-accent" />
               <span className="ml-2 text-xl font-bold text-text">
-                {user?.restaurant?.name || "Restaurant"}
+                {user?.restaurant?.name || "مطعم"}
               </span>
             </div>
 
@@ -205,7 +256,7 @@ const RestaurantDashboard: React.FC = () => {
               {/* User Menu */}
               <div className="relative">
                 <button className="flex items-center text-sm text-text-secondary hover:text-text">
-                  <span>{user?.email}</span>
+                  <span className="ml-2">مرحباً، {user?.email}</span>
                 </button>
               </div>
 
@@ -273,6 +324,8 @@ const RestaurantDashboard: React.FC = () => {
           <Route path="reports" element={<Reports />} />
           <Route path="promotions" element={<Promotions />} />
           <Route path="settings" element={<RestaurantSettings />} />
+          <Route path="delivery-zones" element={<DeliveryZones />} />
+          <Route path="reservations" element={<Reservations />} />
           <Route path="change-password" element={<ChangePassword />} />
         </Routes>
       </div>

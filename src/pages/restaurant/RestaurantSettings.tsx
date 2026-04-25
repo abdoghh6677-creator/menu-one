@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Download, QrCode as QrCodeIcon, ExternalLink, Truck, UtensilsCrossed, ShoppingBag, Banknote, Smartphone, Link, Building2, Upload, Clock, Shield, Save } from "lucide-react";
+import { Download, QrCode as QrCodeIcon, ExternalLink, Truck, Utensils, ShoppingBag, Banknote, Smartphone, Link, Building2, Upload, Clock, Shield, Save, Printer } from "lucide-react";
 import { Card, Button, Loading, Alert, Input, Textarea, Select } from "../../components/ui";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../config/supabase";
@@ -7,6 +7,7 @@ import type { Restaurant } from "../../config/supabase";
 
 const DEFAULT_ORDER_TYPES = { dine_in: true, takeaway: true, delivery: false };
 const DEFAULT_PAYMENT = { cash_enabled: true, instapay_enabled: false, instapay_link: "", instapay_whatsapp: "" };
+const DEFAULT_PRINT = { paper_size: "58mm" as "58mm" | "80mm" | "A4" };
 
 const RestaurantSettings: React.FC = () => {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -21,6 +22,10 @@ const RestaurantSettings: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [savePaymentSuccess, setSavePaymentSuccess] = useState(false);
   const [saveWhatsappSuccess, setSaveWhatsappSuccess] = useState(false);
+  const [printSettings, setPrintSettings] = useState(DEFAULT_PRINT);
+  const [savingPrint, setSavingPrint] = useState(false);
+  const [savePrintSuccess, setSavePrintSuccess] = useState(false);
+  const [isManuallyClosed, setIsManuallyClosed] = useState(false);
 
   // معلومات المطعم
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -80,6 +85,7 @@ const RestaurantSettings: React.FC = () => {
         setRestaurant(data);
         if (data.order_types_enabled) setOrderTypes({ ...DEFAULT_ORDER_TYPES, ...data.order_types_enabled });
         if (data.payment_settings) setPayment({ ...DEFAULT_PAYMENT, ...data.payment_settings });
+        if (data.print_settings) setPrintSettings({ ...DEFAULT_PRINT, ...data.print_settings });
         if (data.whatsapp_number) setWhatsappNumber(data.whatsapp_number);
 
         // تحميل معلومات المطعم
@@ -94,6 +100,7 @@ const RestaurantSettings: React.FC = () => {
 
         // تحميل ساعات العمل
         if (data.business_hours) setBusinessHours({ ...businessHours, ...data.business_hours });
+        if (data.is_manually_closed !== undefined) setIsManuallyClosed(data.is_manually_closed);
 
         // تحميل معاينات الصور
         if (data.logo_url) setLogoPreview(data.logo_url);
@@ -156,6 +163,15 @@ const RestaurantSettings: React.FC = () => {
     if (!error) { setSaveWhatsappSuccess(true); setTimeout(() => setSaveWhatsappSuccess(false), 3000); }
     else { console.error("Save whatsapp error:", error); setError("فشل حفظ رقم واتساب: " + (error?.message || "خطأ غير معروف")); }
   };
+  
+  const savePrintSettings = async () => {
+    if (!restaurant) return;
+    setSavingPrint(true); setSavePrintSuccess(false);
+    const { error } = await supabase.from("restaurants").update({ print_settings: printSettings }).eq("id", restaurant.id);
+    setSavingPrint(false);
+    if (!error) { setSavePrintSuccess(true); setTimeout(() => setSavePrintSuccess(false), 3000); }
+    else { setError("فشل حفظ إعدادات الطباعة: " + (error?.message || "خطأ غير معروف")); }
+  };
 
   // حفظ معلومات المطعم
   const saveRestaurantInfo = async () => {
@@ -167,7 +183,8 @@ const RestaurantSettings: React.FC = () => {
       phone: restaurantInfo.phone,
       email: restaurantInfo.email,
       address: restaurantInfo.address,
-      website: restaurantInfo.website
+      website: restaurantInfo.website,
+      whatsapp_number: whatsappNumber
     }).eq("id", restaurant.id);
     setSavingInfo(false);
     if (!error) { setSaveInfoSuccess(true); setTimeout(() => setSaveInfoSuccess(false), 3000); }
@@ -228,7 +245,10 @@ const RestaurantSettings: React.FC = () => {
   const saveBusinessHours = async () => {
     if (!restaurant) return;
     setSavingHours(true); setSaveHoursSuccess(false);
-    const { error } = await supabase.from("restaurants").update({ business_hours: businessHours }).eq("id", restaurant.id);
+    const { error } = await supabase.from("restaurants").update({ 
+      business_hours: businessHours,
+      is_manually_closed: isManuallyClosed
+    }).eq("id", restaurant.id);
     setSavingHours(false);
     if (!error) { setSaveHoursSuccess(true); setTimeout(() => setSaveHoursSuccess(false), 3000); }
     else { setError("فشل حفظ ساعات العمل: " + (error?.message || "خطأ غير معروف")); }
@@ -304,7 +324,7 @@ const RestaurantSettings: React.FC = () => {
   const menuUrl = `${window.location.origin}/menu/${restaurant.slug}`;
 
   const orderTypeOptions = [
-    { key: "dine_in" as const, label: "داخل المطعم (Dine-in)", desc: "العميل يجلس داخل المطعم", icon: UtensilsCrossed },
+    { key: "dine_in" as const, label: "داخل المطعم (Dine-in)", desc: "العميل يجلس داخل المطعم", icon: Utensils },
     { key: "takeaway" as const, label: "استلام من الفرع (Takeaway)", desc: "العميل يستلم الطلب من الفرع", icon: ShoppingBag },
     { key: "delivery" as const, label: "توصيل (Delivery)", desc: "توصيل الطلب لعنوان العميل", icon: Truck },
   ];
@@ -348,6 +368,13 @@ const RestaurantSettings: React.FC = () => {
             value={restaurantInfo.email}
             onChange={(e) => setRestaurantInfo({ ...restaurantInfo, email: e.target.value })}
             placeholder="info@restaurant.com"
+          />
+          <Input
+            label="رقم واتساب (للتواصل وتلقي الطلبات)"
+            type="tel"
+            placeholder="201234567890"
+            value={whatsappNumber}
+            onChange={(e) => setWhatsappNumber(e.target.value)}
           />
           <Input
             label="الموقع الإلكتروني"
@@ -476,6 +503,28 @@ const RestaurantSettings: React.FC = () => {
         </div>
 
         {saveHoursSuccess && <Alert type="success" message="تم حفظ ساعات العمل بنجاح ✓" className="mb-4" />}
+
+        {/* غلق يدوي */}
+        <div className={`mb-6 p-4 rounded-xl border-2 transition-colors ${isManuallyClosed ? "border-red-400 bg-red-50" : "border-gray-200"}`}>
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${isManuallyClosed ? "bg-red-100" : "bg-gray-100"}`}>
+                <Clock className={`w-5 h-5 ${isManuallyClosed ? "text-red-600" : "text-gray-400"}`} />
+              </div>
+              <div>
+                <p className="font-bold text-text">إغلاق المطعم يدوياً (الآن)</p>
+                <p className="text-sm text-text-secondary">سيظهر المطعم للعملاء كـ "مغلق" بغض النظر عن المواعيد</p>
+              </div>
+            </div>
+            <div className="relative">
+              <input type="checkbox" className="sr-only" checked={isManuallyClosed}
+                onChange={(e) => setIsManuallyClosed(e.target.checked)} />
+              <div className={`w-12 h-6 rounded-full transition-colors ${isManuallyClosed ? "bg-red-500" : "bg-gray-300"}`}>
+                <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${isManuallyClosed ? "right-0.5" : "left-0.5"}`} />
+              </div>
+            </div>
+          </label>
+        </div>
 
         <div className="space-y-4">
           {Object.entries(businessHours).map(([day, hours]) => (
@@ -742,6 +791,53 @@ const RestaurantSettings: React.FC = () => {
         </Button>
       </Card>
 
+      {/* ===== Print Settings ===== */}
+      <Card>
+        <div className="flex items-start gap-2 mb-5">
+          <Printer className="w-6 h-6 text-accent" />
+          <div>
+            <h3 className="text-xl font-bold text-text">إعدادات الطباعة</h3>
+            <p className="text-text-secondary text-sm">تخصيص حجم الورق وشكل الفواتير</p>
+          </div>
+        </div>
+
+        {savePrintSuccess && <Alert type="success" message="تم حفظ إعدادات الطباعة بنجاح ✓" className="mb-4" />}
+
+        <div className="space-y-4">
+          <div>
+            <label className="label mb-2">حجم ورق الطابعة</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {[
+                { id: "58mm", label: "طابعة حرارية 58mm", desc: "الحجم القياسي الصغير" },
+                { id: "80mm", label: "طابعة حرارية 80mm", desc: "الحجم الكبير للمطاعم" },
+                { id: "A4", label: "ورق A4 قياسي", desc: "للطابعات المكتبية العادية" }
+              ].map((size) => (
+                <button
+                  key={size.id}
+                  onClick={() => setPrintSettings({ paper_size: size.id as any })}
+                  className={`p-4 rounded-xl border-2 text-right transition-all ${
+                    printSettings.paper_size === size.id
+                      ? "border-accent bg-accent/5 text-accent"
+                      : "border-gray-100 hover:border-accent/30"
+                  }`}
+                >
+                  <p className="font-bold">{size.label}</p>
+                  <p className="text-xs opacity-70 mt-1">{size.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-bg-subtle p-3 rounded-lg flex items-center gap-2 text-sm text-text-secondary">
+            <Shield className="w-4 h-4 text-accent" />
+            <span>سيتم تطبيق هذه الإعدادات تلقائياً عند طباعة فواتير العملاء أو فواتير المطبخ.</span>
+          </div>
+        </div>
+
+        <Button onClick={savePrintSettings} loading={savingPrint} fullWidth className="mt-5">
+          حفظ إعدادات الطباعة
+        </Button>
+      </Card>
+
       {/* ===== Order Types ===== */}
       <Card>
         <div className="mb-4">
@@ -774,6 +870,37 @@ const RestaurantSettings: React.FC = () => {
           ))}
         </div>
         <Button onClick={saveOrderTypes} loading={saving} fullWidth>حفظ إعدادات الطلبات</Button>
+      </Card>
+
+      {/* ===== Print Settings ===== */}
+      <Card>
+        <div className="flex items-start gap-2 mb-4">
+          <Printer className="w-6 h-6 text-accent" />
+          <div>
+            <h3 className="text-xl font-bold text-text">إعدادات الطباعة</h3>
+            <p className="text-text-secondary text-sm">تخصيص حجم الورق وتنسيق الفواتير</p>
+          </div>
+        </div>
+
+        {savePrintSuccess && <Alert type="success" message="تم حفظ إعدادات الطباعة بنجاح ✓" className="mb-4" />}
+
+        <div className="space-y-4">
+          <Select
+            label="حجم ورق الطابعة"
+            value={printSettings.paper_size}
+            onChange={(e) => setPrintSettings({ ...printSettings, paper_size: e.target.value as any })}
+            options={[
+              { value: "58mm", label: "58mm (طابعة حرارية صغيرة)" },
+              { value: "80mm", label: "80mm (طابعة حرارية كبيرة)" },
+              { value: "A4", label: "A4 (ورق عادي)" },
+            ]}
+          />
+          <p className="text-xs text-text-secondary">سيتم تنسيق الفاتورة تلقائياً لتناسب هذا المقاس</p>
+        </div>
+
+        <Button onClick={savePrintSettings} loading={savingPrint} fullWidth className="mt-5">
+          حفظ إعدادات الطباعة
+        </Button>
       </Card>
 
       {/* ===== Coming Soon ===== */}

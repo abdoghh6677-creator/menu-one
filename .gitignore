@@ -35,3 +35,4 @@ dist-ssr
 PROGRESS.md
 
 .vercel
+.env*.local

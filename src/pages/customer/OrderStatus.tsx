@@ -34,17 +34,38 @@ const OrderStatusPage: React.FC = () => {
     loadOrder();
 
     // Real-time subscription
+    // Real-time subscription for order updates
+    console.log("Subscribing to order updates for:", orderId);
     const sub = supabase
-      .channel(`order-${orderId}`)
+      .channel(`order_tracking_${orderId}`)
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
         table: "orders",
         filter: `id=eq.${orderId}`,
       }, (payload) => {
-        setOrder((prev: any) => ({ ...prev, ...payload.new }));
+        console.log("Order update received:", payload.new);
+        if (payload.new) {
+          setOrder((prev: any) => ({
+            ...prev,
+            ...payload.new,
+            // Ensure nested items or JSON fields are preserved if not in payload
+            items: payload.new.items || prev.items,
+          }));
+          
+          // Clear active order session if terminal status reached
+          const terminalStatuses = ['completed', 'cancelled', 'rejected'];
+          if (terminalStatuses.includes(payload.new.status)) {
+            const restaurantId = payload.new.restaurant_id || order?.restaurant_id;
+            if (restaurantId) {
+              localStorage.removeItem(`activeOrder_${restaurantId}`);
+            }
+          }
+        }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Order subscription status:", status);
+      });
 
     return () => { sub.unsubscribe(); };
   }, [orderId]);
@@ -58,6 +79,13 @@ const OrderStatusPage: React.FC = () => {
 
     if (!error && data) {
       setOrder(data);
+
+      // Clear active order session if terminal status reached
+      const terminalStatuses = ["completed", "cancelled", "rejected"];
+      if (terminalStatuses.includes(data.status)) {
+        localStorage.removeItem(`activeOrder_${data.restaurant_id}`);
+      }
+
       // Load restaurant
       const { data: rest } = await supabase
         .from("restaurants")

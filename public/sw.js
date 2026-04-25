@@ -60,10 +60,13 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
-
-  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).then((r) => { caches.open(DYNAMIC_CACHE).then((c) => c.put(request, r.clone())); return r; })
+      fetch(request)
+        .then((r) => {
+          const rClone = r.clone();
+          caches.open(DYNAMIC_CACHE).then((c) => c.put(request, rClone));
+          return r;
+        })
         .catch(() => caches.match('/index.html'))
     );
     return;

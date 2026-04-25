@@ -64,6 +64,7 @@ export interface Restaurant {
     saturday: { open: string; close: string; closed: boolean };
     sunday: { open: string; close: string; closed: boolean };
   };
+  is_manually_closed?: boolean;
   subscription_plan: "free_trial" | "starter" | "pro" | "enterprise";
   status: "active" | "blocked" | "trial";
   is_active: boolean;
@@ -80,6 +81,9 @@ export interface Restaurant {
     dine_in: boolean;
     takeaway: boolean;
     delivery: boolean;
+  };
+  print_settings?: {
+    paper_size: "58mm" | "80mm" | "A4";
   };
   created_at: string;
   updated_at: string;
@@ -123,6 +127,8 @@ export interface Order {
   items: OrderItem[];
   subtotal: number;
   tax: number;
+  delivery_fee?: number;
+  delivery_zone_id?: string;
   discount?: number;
   total: number;
   status:
@@ -143,6 +149,8 @@ export interface Order {
   ready_at?: string;
   completed_at?: string;
   cancelled_at?: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -150,6 +158,7 @@ export interface Order {
 export interface OrderItem {
   menu_item_id: string;
   name: string;
+  name_ar?: string;
   quantity: number;
   base_price: number;
   selected_size?: { name: string; price: number };
@@ -164,4 +173,29 @@ export interface AdminUser {
   password_hash: string;
   name?: string;
   created_at: string;
+}
+
+export interface DeliveryZone {
+  id: string;
+  restaurant_id: string;
+  name_ar: string;
+  name_en: string;
+  delivery_fee: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Reservation {
+  id: string;
+  restaurant_id: string;
+  customer_name: string;
+  customer_phone: string;
+  reservation_date: string;
+  reservation_time: string;
+  guests_count: number;
+  table_number?: string;
+  status: "pending" | "confirmed" | "cancelled" | "rejected";
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
 }

@@ -17,7 +17,7 @@ export default {
         warning: "#F59E0B",
       },
       fontFamily: {
-        sans: ["Cairo", "Inter", "system-ui", "sans-serif"],
+        sans: ["IBM Plex Arabic", "system-ui", "sans-serif"],
       },
       transitionTimingFunction: {
         smooth: "cubic-bezier(0.4, 0, 0.2, 1)",

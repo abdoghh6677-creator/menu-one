@@ -42,6 +42,7 @@ const Orders: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [restaurantName, setRestaurantName] = useState<string>("");
+  const [restaurant, setRestaurant] = useState<any>(null);
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [restaurantWhatsapp, setRestaurantWhatsapp] = useState<string>("");
   const [newOrderNotification, setNewOrderNotification] = useState<string | null>(null);
@@ -66,12 +67,14 @@ const Orders: React.FC = () => {
     const fetchRestaurant = async () => {
       const { data, error } = await supabase
         .from("restaurants")
-        .select("whatsapp_number")
+        .select("*")
         .eq("id", user.restaurant_id)
         .single();
 
       if (!error && data) {
+        setRestaurant(data);
         setRestaurantWhatsapp(data.whatsapp_number || "");
+        setRestaurantName(data.name || "");
       }
     };
 
@@ -84,12 +87,6 @@ const Orders: React.FC = () => {
       );
 
       if (newPendingOrders.length > 0 && prevOrderIdsRef.current.size > 0) {
-        // صوت الإشعار
-        playNotificationBeep();
-        // Push notification لكل طلب جديد
-        newPendingOrders.forEach((order) => {
-          notifyNewOrder(order.order_number, order.order_type);
-        });
         // إشعار بصري في لوحة التحكم
         setNewOrderNotification(`وصل ${newPendingOrders.length} طلب جديد!`);
         // إخفاء الإشعار بعد 5 ثوانٍ
@@ -111,8 +108,17 @@ const Orders: React.FC = () => {
   const handlePrintOrder = (order: Order) => {
     const orderTypeLabels: Record<string, string> = { qr: "داخل المطعم", counter: "استلام من الفرع", phone: "توصيل", table: "طاولة" };
     const statusLabels: Record<string, string> = { pending: "معلق", accepted: "مقبول", preparing: "قيد التحضير", ready: "جاهز", completed: "مكتمل", cancelled: "ملغي", rejected: "مرفوض" };
-    const printWindow = window.open("", "_blank", "width=400,height=600");
+    
+    // إعدادات حجم الورق
+    const paperSize = restaurant?.print_settings?.paper_size || "58mm";
+    const isA4 = paperSize === "A4";
+    const maxWidth = isA4 ? "190mm" : paperSize === "80mm" ? "72mm" : "48mm";
+    const fontSize = isA4 ? "14pt" : paperSize === "80mm" ? "11pt" : "9pt";
+    const logoSize = isA4 ? "120px" : paperSize === "80mm" ? "80px" : "60px";
+
+    const printWindow = window.open("", "_blank", "width=800,height=600");
     if (!printWindow) return;
+    
     const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -120,22 +126,40 @@ const Orders: React.FC = () => {
   <meta charset="UTF-8">
   <title>طلب #${order.order_number}</title>
   <style>
+    @page { margin: 2mm; size: ${isA4 ? 'A4' : 'portrait'}; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; max-width: 300px; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      font-size: ${fontSize}; 
+      width: ${maxWidth}; 
+      margin: 0 auto; 
+      color: #000;
+      background: white; 
+      line-height: 1.3;
+    }
     .center { text-align: center; }
     .bold { font-weight: bold; }
-    .big { font-size: 18px; }
-    .line { border-top: 1px dashed #000; margin: 8px 0; }
-    .row { display: flex; justify-content: space-between; margin: 3px 0; }
-    .title { font-size: 16px; font-weight: bold; margin: 5px 0; }
-    @media print { body { margin: 0; } }
+    .big { font-size: 1.25em; margin: 2px 0; }
+    .line { border-top: 1px dashed #000; margin: 5px 0; }
+    .row { display: flex; justify-content: space-between; margin: 3px 0; gap: 5px; }
+    .title { font-size: 1.1em; font-weight: bold; margin: 3px 0; background: #eee; padding: 2px; }
+    .logo { width: ${logoSize}; height: ${logoSize}; object-fit: contain; margin: 0 auto 5px; display: block; border-radius: 8px; }
+    .item-row { margin-bottom: 5px; }
+    .item-details { font-size: 0.9em; color: #333; padding-right: 10px; }
+    .total-row { font-size: 1.15em; font-weight: bold; margin-top: 5px; border-top: 1px solid #000; padding-top: 3px; }
+    .footer { font-size: 0.85em; margin-top: 15px; text-align: center; border-top: 1px solid #eee; padding-top: 8px; }
+    @media print { 
+      body { width: 100%; }
+      .no-print { display: none; }
+    }
   </style>
 </head>
 <body>
   <div class="center">
-    <div class="big bold">🍽️ طلب جديد</div>
-    <div class="title">#${order.order_number}</div>
-    <div>${new Date(order.created_at).toLocaleString('ar-EG', {
+    ${restaurant?.logo_url ? `<img src="${restaurant.logo_url}" class="logo" />` : ""}
+    <div class="big bold">${restaurant?.name || "🍽️ طلب جديد"}</div>
+    <div class="title">فاتورة عميل #${order.order_number}</div>
+    <div style="font-size: 0.85em;">${new Date(order.created_at).toLocaleString('ar-EG', {
       timeZone: 'Africa/Cairo',
       year: 'numeric',
       month: 'long',
@@ -144,29 +168,60 @@ const Orders: React.FC = () => {
       minute: '2-digit'
     })}</div>
   </div>
+  
   <div class="line"></div>
+  
   <div class="row"><span class="bold">نوع الطلب:</span><span>${orderTypeLabels[order.order_type] || order.order_type}</span></div>
+  ${order.scheduled_date ? `<div class="row" style="color:#d9480f; background:#fff4e6; padding:2px; border-radius:4px;"><span class="bold">مجدول لـ:</span><span>${order.scheduled_date} ${order.scheduled_time}</span></div>` : ""}
   ${order.table_number ? `<div class="row"><span class="bold">الطاولة:</span><span>${order.table_number}</span></div>` : ""}
   ${order.customer_name ? `<div class="row"><span class="bold">العميل:</span><span>${order.customer_name}</span></div>` : ""}
   ${order.customer_phone ? `<div class="row"><span class="bold">الهاتف:</span><span>${order.customer_phone}</span></div>` : ""}
-  <div class="row"><span class="bold">الحالة:</span><span>${statusLabels[order.status] || order.status}</span></div>
+  <div class="row"><span class="bold">طريقة الدفع:</span><span>${order.payment_method === 'instapay' ? 'إنستا باي' : 'نقداً'}</span></div>
+  
   <div class="line"></div>
-  <div class="bold" style="margin-bottom:5px">الأصناف:</div>
+  
+  <div class="bold" style="margin-bottom:4px">الأصناف:</div>
+  <div style="margin-bottom: 8px;">
   ${(order.items as any[])?.map((item: any) => `
-    <div class="row">
-      <span>${item.quantity}× ${item.name}${item.selected_size ? ` (${item.selected_size.name})` : ""}</span>
-      <span>${item.item_total * item.quantity} ج.م</span>
+    <div class="item-row">
+      <div class="row">
+        <span>${item.quantity}× ${item.name}</span>
+        <span>${(item.item_total * item.quantity).toFixed(2)}</span>
+      </div>
+      ${item.selected_size ? `<div class="item-details"> الحجم: ${item.selected_size.name}</div>` : ""}
+      ${item.selected_addons?.length ? `<div class="item-details"> إضافات: ${item.selected_addons.map((a: any) => a.name).join(" + ")}</div>` : ""}
     </div>
-    ${item.selected_addons?.length ? `<div style="font-size:11px;color:#555;padding-right:10px">${item.selected_addons.map((a: any) => a.name).join("، ")}</div>` : ""}
   `).join("") || ""}
+  </div>
+  
   <div class="line"></div>
-  <div class="row"><span>المجموع:</span><span>${order.subtotal} ج.م</span></div>
-  <div class="row"><span>الضريبة:</span><span>${order.tax?.toFixed(2)} ج.م</span></div>
-  <div class="row bold big"><span>الإجمالي:</span><span>${order.total} ج.م</span></div>
-  ${order.customer_notes ? `<div class="line"></div><div class="bold">ملاحظات:</div><div>${order.customer_notes}</div>` : ""}
-  <div class="line"></div>
-  <div class="center" style="font-size:11px">شكراً لزيارتكم</div>
-  <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); }<\/script>
+  
+  <div class="row"><span>المجموع:</span><span>${order.subtotal?.toFixed(2)}</span></div>
+  ${order.tax ? `<div class="row"><span>الضريبة:</span><span>${order.tax?.toFixed(2)}</span></div>` : ""}
+  ${order.delivery_fee ? `<div class="row"><span>رسوم التوصيل:</span><span>${order.delivery_fee?.toFixed(2)}</span></div>` : ""}
+  ${order.discount ? `<div class="row text-red-600"><span>الخصم:</span><span>-${order.discount?.toFixed(2)}</span></div>` : ""}
+  <div class="row total-row">
+    <span>الإجمالي:</span>
+    <span>${order.total?.toFixed(2)} ج.م</span>
+  </div>
+  
+  ${order.customer_notes ? `
+    <div class="line"></div>
+    <div class="bold" style="font-size: 0.85em;">ملاحظات:</div>
+    <div style="font-size: 0.85em;">${order.customer_notes}</div>
+  ` : ""}
+  
+  <div class="center footer">
+    <p>شكراً لزيارتكم!</p>
+    <p style="margin-top: 4px; font-size: 0.8em; opacity: 0.8;">تم إصدار الفاتورة بواسطة ${restaurant?.name}</p>
+  </div>
+  
+  <script>
+    window.onload = () => { 
+      window.print(); 
+      setTimeout(() => window.close(), 500); 
+    }
+  <\/script>
 </body>
 </html>`;
     printWindow.document.write(html);
@@ -174,85 +229,69 @@ const Orders: React.FC = () => {
   };
 
   const handlePrintKitchenOrder = (order: Order) => {
-    const orderTypeLabels: Record<string, string> = { qr: "داخل المطعم", counter: "استلام من الفرع", phone: "توصيل", table: "طاولة" };
-    const statusLabels: Record<string, string> = { pending: "معلق", accepted: "مقبول", preparing: "قيد التحضير", ready: "جاهز", completed: "مكتمل", cancelled: "ملغي", rejected: "مرفوض" };
-    const printWindow = window.open("", "_blank", "width=400,height=600");
+    const orderTypeLabels: Record<string, string> = { qr: "داخلي", counter: "تيك أواي", phone: "توصيل", table: "طاولة" };
+    
+    const paperSize = restaurant?.print_settings?.paper_size || "58mm";
+    const isA4 = paperSize === "A4";
+    const maxWidth = isA4 ? "190mm" : paperSize === "80mm" ? "72mm" : "48mm";
+    const fontSize = isA4 ? "16pt" : paperSize === "80mm" ? "12pt" : "11pt";
+
+    const printWindow = window.open("", "_blank", "width=800,height=600");
     if (!printWindow) return;
+    
     const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>فاتورة المطبخ - طلب #${order.order_number}</title>
+  <title>مطبخ - #${order.order_number}</title>
   <style>
+    @page { margin: 2mm; size: auto; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; max-width: 350px; background: #f8f9fa; }
-    .header { background: #dc3545; color: white; padding: 15px; text-align: center; border-radius: 8px; margin-bottom: 10px; }
-    .header-title { font-size: 20px; font-weight: bold; }
-    .header-subtitle { font-size: 12px; opacity: 0.9; }
-    .order-info { background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 2px solid #007bff; }
-    .item { background: white; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 4px solid #28a745; }
-    .item-header { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
-    .item-details { font-size: 12px; color: #666; }
-    .addons { background: #fff3cd; padding: 5px; margin-top: 5px; border-radius: 3px; font-size: 11px; }
-    .urgent { background: #ffeaa7; border: 2px solid #d63031; animation: blink 1s infinite; }
-    .line { border-top: 1px solid #dee2e6; margin: 10px 0; }
-    .footer { text-align: center; font-size: 12px; color: #666; margin-top: 10px; }
-    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.5; } }
-    @media print { body { margin: 0; background: white; } .urgent { background: #ffeaa7 !important; } }
+    body { font-family: 'Arial Black', Gadget, sans-serif; font-size: ${fontSize}; width: ${maxWidth}; margin: 0 auto; color: #000; }
+    .header { border: 3px solid #000; padding: 5px; text-align: center; margin-bottom: 5px; }
+    .header-title { font-size: 1.5em; font-weight: bold; text-decoration: underline; }
+    .info { border-bottom: 2px solid #000; padding: 5px 0; margin-bottom: 5px; font-weight: bold; }
+    .item { padding: 5px 0; border-bottom: 1px dashed #000; }
+    .qty { font-size: 1.4em; border: 2px solid #000; padding: 0 5px; margin-left: 5px; }
+    .addons { background: #f0f0f0; padding: 3px; margin: 3px 0; border: 1px solid #000; }
+    .notes { background: #000; color: #fff; padding: 8px; margin-top: 10px; font-weight: bold; }
+    @media print { body { width: 100%; } }
   </style>
 </head>
 <body>
-  <div class="header ${order.status === 'pending' ? 'urgent' : ''}">
-    <div class="header-title">🍳 فاتورة المطبخ</div>
-    <div class="header-subtitle">طلب #${order.order_number}</div>
+  <div class="header">
+    <div class="header-title">بون مطبخ #${order.order_number}</div>
+    <div>النوع: ${orderTypeLabels[order.order_type] || order.order_type} ${order.table_number ? `(طاولة ${order.table_number})` : ""}</div>
   </div>
 
-  <div class="order-info">
-    <div><strong>الوقت:</strong> ${new Date(order.created_at).toLocaleString('ar-EG', {
-      timeZone: 'Africa/Cairo',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}</div>
-    <div><strong>النوع:</strong> ${orderTypeLabels[order.order_type] || order.order_type}</div>
-    ${order.table_number ? `<div><strong>الطاولة:</strong> ${order.table_number}</div>` : ""}
-    <div><strong>الحالة:</strong> ${statusLabels[order.status] || order.status}</div>
-    ${order.customer_name ? `<div><strong>العميل:</strong> ${order.customer_name}</div>` : ""}
+  <div class="info">
+    <div>الوقت: ${new Date(order.created_at).toLocaleTimeString('ar-EG')}</div>
+    ${order.customer_name ? `<div>العميل: ${order.customer_name}</div>` : ""}
   </div>
 
   <div style="margin-bottom: 10px;">
-    ${(order.items as any[])?.map((item: any, index: number) => `
-      <div class="item ${order.status === 'pending' ? 'urgent' : ''}">
-        <div class="item-header">${index + 1}. ${item.name}</div>
-        <div class="item-details">
-          الكمية: ${item.quantity} | ${item.selected_size ? `الحجم: ${item.selected_size.name}` : ""}
+    ${(order.items as any[])?.map((item: any) => `
+      <div class="item">
+        <div style="display:flex; align-items:center;">
+          <span class="qty">${item.quantity}</span>
+          <span style="font-size:1.2em;">${item.name}</span>
         </div>
-        ${item.selected_addons?.length ? `<div class="addons">إضافات: ${item.selected_addons.map((a: any) => a.name).join("، ")}</div>` : ""}
+        ${item.selected_size ? `<div style="font-size:0.9em;">- الحجم: ${item.selected_size.name}</div>` : ""}
+        ${item.selected_addons?.length ? `<div class="addons">** إضافات: ${item.selected_addons.map((a: any) => a.name).join(", ")}</div>` : ""}
       </div>
     `).join("") || ""}
   </div>
 
   ${order.customer_notes ? `
-    <div class="line"></div>
-    <div style="background: #f8d7da; color: #721c24; padding: 8px; border-radius: 5px; border: 1px solid #f5c6cb;">
-      <strong>ملاحظات خاصة:</strong><br>
+    <div class="notes">
+      ملاحظات هامة للتحضير:<br>
       ${order.customer_notes}
     </div>
   ` : ""}
 
-  <div class="footer">
-    <div>تم إنشاء الفاتورة في ${new Date().toLocaleString('ar-EG', {
-      timeZone: 'Africa/Cairo',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}</div>
-    <div style="margin-top: 5px; font-weight: bold;">مطبخ ${restaurantName}</div>
+  <div style="text-align:center; font-size:0.8em; margin-top:10px; border-top:1px solid #000;">
+    تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}
   </div>
 
   <script>
@@ -284,9 +323,7 @@ const Orders: React.FC = () => {
     }
 
     // إشعار صوتي حسب نوع التحديث
-    if (newStatus === "accepted") {
-      playSuccessBeep();
-    } else if (newStatus === "completed") {
+    if (["accepted", "preparing", "ready", "completed"].includes(newStatus)) {
       playSuccessBeep();
     } else if (newStatus === "cancelled" || newStatus === "rejected") {
       playWarningBeep();
@@ -307,11 +344,21 @@ const Orders: React.FC = () => {
     const variants: Record<string, any> = {
       pending: "warning",
       accepted: "accent-secondary",
+      preparing: "warning",
+      ready: "success",
       completed: "success",
       cancelled: "neutral",
       rejected: "error",
     };
-    const statusLabels: Record<string, string> = { pending: "معلق", accepted: "مقبول", preparing: "قيد التحضير", ready: "جاهز", completed: "مكتمل", cancelled: "ملغي", rejected: "مرفوض" };
+    const statusLabels: Record<string, string> = { 
+      pending: "جديد", 
+      accepted: "مقبول", 
+      preparing: "قيد التحضير", 
+      ready: "جاهز", 
+      completed: "مكتمل", 
+      cancelled: "ملغي", 
+      rejected: "مرفوض" 
+    };
     return <Badge variant={variants[status] || "neutral"}>{statusLabels[status] || status}</Badge>;
   };
 
@@ -321,6 +368,10 @@ const Orders: React.FC = () => {
         return <Clock className="w-5 h-5 text-warning" />;
       case "accepted":
         return <Package className="w-5 h-5 text-accent-secondary" />;
+      case "preparing":
+        return <ChefHat className="w-5 h-5 text-orange-500" />;
+      case "ready":
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
       case "completed":
         return <CheckCircle className="w-5 h-5 text-success" />;
       case "cancelled":
@@ -433,32 +484,39 @@ const Orders: React.FC = () => {
           </Button>
           {pendingCount > 0 && (
             <Badge variant="warning" className="text-lg px-4 py-2 animate-pulse">
-              {pendingCount} Pending
+              {pendingCount} بانتظار التأكيد
             </Badge>
           )}
         </div>
       </div>
 
       {/* Real-time indicator */}
-      <div className="flex صنف-center space-x-2 text-sm text-success">
+      <div className="flex items-center gap-2 text-sm text-success font-medium">
         <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-        <span>Live order updates • Sound notifications enabled</span>
+        <span>تحديثات الطلبات مباشرة • صوت التنبيه مفعل</span>
       </div>
 
       {/* Status Filter */}
-      <div className="flex flex-wrap gap-2">
-        {["pending", "accepted", "completed", "cancelled"].map((status) => (
+      <div className="flex flex-wrap gap-2 text-sm md:text-base">
+        {[
+          { id: "pending", label: "جديدة" },
+          { id: "accepted", label: "مقبولة" },
+          { id: "preparing", label: "قيد التحضير" },
+          { id: "ready", label: "جاهزة" },
+          { id: "completed", label: "مكتملة" },
+          { id: "cancelled", label: "ملغاة" }
+        ].map((item) => (
           <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              statusFilter === status
-                ? "bg-accent text-white"
-                : "bg-bg-subtle text-text-secondary hover:bg-border"
+            key={item.id}
+            onClick={() => setStatusFilter(item.id)}
+            className={`px-4 py-2 rounded-xl font-bold transition-all ${
+              statusFilter === item.id
+                ? "bg-accent text-white shadow-md transform scale-105"
+                : "bg-white text-text-secondary border border-border hover:border-accent/30"
             }`}
           >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-            {status === "pending" && ` (${pendingCount})`}
+            {item.label}
+            {item.id === "pending" && pendingCount > 0 && ` (${pendingCount})`}
           </button>
         ))}
       </div>
@@ -468,10 +526,10 @@ const Orders: React.FC = () => {
         <Card className="text-center py-12">
           <Package className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-50" />
           <h3 className="text-xl font-semibold text-text mb-2">
-            لا توجد طلبات Found
+            لا توجد طلبات
           </h3>
           <p className="text-text-secondary">
-            No {statusFilter} orders at the moment.
+            لا توجد طلبات في هذه الفئة حالياً.
           </p>
         </Card>
       ) : (
@@ -497,6 +555,12 @@ const Orders: React.FC = () => {
                         <p className="text-sm text-text-secondary">
                           {formatDateTime(order.created_at)}
                         </p>
+                        {order.scheduled_date && (
+                          <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-md w-fit">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>مجدول: {order.scheduled_date} {order.scheduled_time}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {getStatusBadge(order.status)}
@@ -507,9 +571,9 @@ const Orders: React.FC = () => {
                     <div className="flex صنف-center space-x-2 text-text-secondary">
                       <Package className="w-4 h-4" />
                       <span>
-                        {order.order_type} •{" "}
-                        {order.table_number && `Table ${order.table_number}`}
-                        {!order.table_number && "Takeaway"}
+                        {order.order_type === 'qr' ? 'داخل المطعم' : order.order_type === 'counter' ? 'تيك أواي' : 'توصيل'} •{" "}
+                        {order.table_number && `طاولة ${order.table_number}`}
+                        {!order.table_number && "استلام خارجي"}
                       </span>
                     </div>
                     {order.customer_phone && (
@@ -542,10 +606,10 @@ const Orders: React.FC = () => {
 
                   {/* Customer Notes */}
                   {order.customer_notes && (
-                    <div className="flex صنف-start space-x-2 text-sm bg-bg-subtle rounded-lg p-3">
-                      <MessageSquare className="w-4 h-4 text-accent-secondary mt-0.5" />
+                    <div className="flex items-start gap-2 text-sm bg-bg-subtle rounded-lg p-3">
+                      <MessageSquare className="w-4 h-4 text-accent mt-0.5" />
                       <div>
-                        <p className="font-medium text-text">Customer Notes:</p>
+                        <p className="font-medium text-text">ملاحظات العميل:</p>
                         <p className="text-text-secondary">
                           {order.customer_notes}
                         </p>
@@ -609,54 +673,86 @@ const Orders: React.FC = () => {
                     </Button>
                   )}
 
+                  {/* Pending -> Accepted */}
                   {order.status === "pending" && (
                     <>
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
                         fullWidth
                         onClick={() => handleStatusUpdate(order.id, "accepted")}
                       >
-                        Accept
+                        قبول الطلب
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         fullWidth
+                        className="text-error border-error"
                         onClick={() => {
                           setSelectedOrder(order);
                           setShowRejectModal(true);
                         }}
                       >
-                        إلغاء
+                        رفض
                       </Button>
                     </>
                   )}
 
+                  {/* Accepted -> Preparing */}
                   {order.status === "accepted" && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        fullWidth
-                        onClick={() =>
-                          handleStatusUpdate(order.id, "completed")
-                        }
-                      >
-                        Mark Complete
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        fullWidth
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setShowRejectModal(true);
-                        }}
-                      >
-                        إلغاء
-                      </Button>
-                    </>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-orange-500 hover:bg-orange-600"
+                      fullWidth
+                      onClick={() => handleStatusUpdate(order.id, "preparing")}
+                    >
+                      بدء التحضير
+                    </Button>
+                  )}
+
+                  {/* Preparing -> Ready */}
+                  {order.status === "preparing" && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-green-500 hover:bg-green-600"
+                      fullWidth
+                      onClick={() => handleStatusUpdate(order.id, "ready")}
+                    >
+                      جاهز للتسليم
+                    </Button>
+                  )}
+
+                  {/* Ready -> Completed */}
+                  {order.status === "ready" && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-success hover:bg-success/90"
+                      fullWidth
+                      onClick={() => handleStatusUpdate(order.id, "completed")}
+                    >
+                      تم التسليم (إكمال)
+                    </Button>
+                  )}
+
+                  {/* Cancellation option for any non-terminal state */}
+                  {["accepted", "preparing", "ready"].includes(order.status) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      fullWidth
+                      className="text-gray-400 border-gray-200"
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setShowRejectModal(true);
+                      }}
+                    >
+                      إلغاء الطلب
+                    </Button>
                   )}
                 </div>
               </div>
@@ -729,8 +825,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     >
       <div className="space-y-6">
         {/* Status */}
-        <div className="flex صنف-center justify-between p-4 bg-bg-subtle rounded-lg">
-          <span className="font-medium text-text">Status</span>
+        <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg">
+          <span className="font-medium text-text">الحالة</span>
           <Badge
             variant={
               order.status === "completed"
@@ -746,17 +842,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
         {/* Customer Info */}
         <div>
-          <h4 className="font-semibold text-text mb-3">Customer Information</h4>
+          <h4 className="font-semibold text-text mb-3">بيانات العميل</h4>
           <div className="space-y-2 text-sm">
             {order.customer_name && (
               <p className="text-text-secondary">
-                <strong className="text-text">Name:</strong>{" "}
+                <strong className="text-text">الاسم:</strong>{" "}
                 {order.customer_name}
               </p>
             )}
             {order.customer_phone && (
               <p className="text-text-secondary">
-                <strong className="text-text">Phone:</strong>{" "}
+                <strong className="text-text">الهاتف:</strong>{" "}
                 {order.customer_phone}
               </p>
             )}
@@ -775,25 +871,25 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
         {/* Order Items */}
         <div>
-          <h4 className="font-semibold text-text mb-3">Order Items</h4>
+          <h4 className="font-semibold text-text mb-3">أصناف الطلب</h4>
           <div className="space-y-3">
             {order.items?.map((item: any, index: number) => (
               <div
                 key={index}
-                className="flex صنف-start justify-between p-3 bg-bg-subtle rounded-lg"
+                className="flex items-start justify-between p-3 bg-bg-subtle rounded-lg"
               >
                 <div className="flex-1">
                   <p className="font-medium text-text">
-                    {item.quantity}x {item.name}
+                    {item.quantity}× {item.name}
                   </p>
-                  {item.size && (
+                  {item.selected_size && (
                     <p className="text-sm text-text-secondary">
-                      Size: {item.size}
+                      الحجم: {item.selected_size.name}
                     </p>
                   )}
-                  {item.addons && item.addons.length > 0 && (
+                  {item.selected_addons && item.selected_addons.length > 0 && (
                     <p className="text-sm text-text-secondary">
-                      Add-ons: {item.addons.join(", ")}
+                      إضافات: {item.selected_addons.map((a: any) => a.name).join(", ")}
                     </p>
                   )}
                 </div>
@@ -812,12 +908,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <span>{formatCurrency(order.subtotal)}</span>
           </div>
           <div className="flex justify-between text-text-secondary">
-            <span>Tax</span>
+            <span>الضريبة</span>
             <span>{formatCurrency(order.tax)}</span>
           </div>
           {order.discount && order.discount > 0 && (
             <div className="flex justify-between text-success">
-              <span>Discount</span>
+              <span>الخصم</span>
               <span>-{formatCurrency(order.discount)}</span>
             </div>
           )}
@@ -829,8 +925,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
         {/* Notes */}
         {order.customer_notes && (
-          <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-4">
-            <h4 className="font-semibold text-text mb-2">Customer Notes</h4>
+          <div className="bg-accent/5 border border-accent/20 rounded-lg p-4">
+            <h4 className="font-semibold text-text mb-2">ملاحظات العميل</h4>
             <p className="text-text-secondary text-sm">
               {order.customer_notes}
             </p>
@@ -840,13 +936,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         {/* Payment Info */}
         {order.payment_method && (
           <div>
-            <h4 className="font-semibold text-text mb-2">Payment</h4>
+            <h4 className="font-semibold text-text mb-2">الدفع</h4>
             <p className="text-text-secondary text-sm">
-              Method: {order.payment_method}
+              الطريقة: {order.payment_method === 'cash' ? 'نقداً' : 'إنستا باي'}
             </p>
             {order.payment_transaction_id && (
               <p className="text-text-secondary text-sm">
-                Transaction ID: {order.payment_transaction_id}
+                رقم المعاملة: {order.payment_transaction_id}
               </p>
             )}
           </div>
@@ -911,20 +1007,20 @@ const RejectOrderModal: React.FC<RejectOrderModalProps> = ({
       <div className="space-y-4">
         <Alert
           type="warning"
-          message="Are you sure you want to cancel this order? This action cannot be undone."
+          message="هل أنت متأكد من إلغاء هذا الطلب؟ لا يمكن التراجع عن هذا الإجراء."
         />
 
         <Textarea
-          label="Reason for Cancellation (Optional)"
+          label="سبب الإلغاء (اختياري)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="E.g., Out of stock, Kitchen closed, Customer requested, etc."
+          placeholder="مثلاً: نفذ المخزون، المطبخ مغلق، إلخ..."
           rows={3}
         />
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} fullWidth>
-            Back
+            رجوع
           </Button>
           <Button variant="danger" onClick={handleCancel} fullWidth>
             إلغاء الطلب

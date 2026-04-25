@@ -1,5 +1,5 @@
 import { supabase } from "../config/supabase";
-import type { Order, MenuItem } from "../config/supabase";
+import type { Order, MenuItem, DeliveryZone } from "../config/supabase";
 
 /**
  * Restaurant API Service
@@ -126,14 +126,28 @@ export const subscribeToMenuItems = (
   callback: (items: MenuItem[]) => void
 ) => {
   const fetchItems = async () => {
-    const { data, error } = await supabase
-      .from("menu_items")
-      .select("*")
-      .eq("restaurant_id", restaurantId)
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("menu_items")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      callback(data);
+      if (error) {
+        console.error("Error fetching menu items:", error);
+        // Return empty array if error
+        callback([]);
+        return;
+      }
+
+      if (data) {
+        callback(data);
+      } else {
+        callback([]);
+      }
+    } catch (err) {
+      console.error("Exception while fetching menu items:", err);
+      callback([]);
     }
   };
 
@@ -426,8 +440,100 @@ export const getRestaurantStats = async (restaurantId: string) => {
 };
 
 // =====================================================
-// Promotions Service
+// Reservations Service
 // =====================================================
+
+export interface Reservation {
+  id: string;
+  restaurant_id: string;
+  customer_name: string;
+  customer_phone: string;
+  reservation_date: string;
+  reservation_time: string;
+  guests_count: number;
+  table_number?: string;
+  status: "pending" | "confirmed" | "cancelled" | "rejected";
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Subscribe to restaurant's reservations with real-time updates
+export const subscribeToReservations = (
+  restaurantId: string,
+  callback: (reservations: Reservation[]) => void
+) => {
+  const fetchReservations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching reservations:", error);
+        callback([]); 
+        return;
+      }
+      
+      callback(data || []);
+    } catch (err) {
+      console.error("Exception in fetchReservations:", err);
+      callback([]);
+    }
+  };
+
+  fetchReservations();
+
+  const subscription = supabase
+    .channel(`restaurant-reservations-${restaurantId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "reservations",
+        filter: `restaurant_id=eq.${restaurantId}`,
+      },
+      () => {
+        fetchReservations();
+      }
+    )
+    .subscribe();
+
+  return subscription;
+};
+
+// Create a new reservation (from customer or dashboard)
+export const createReservation = async (reservation: Partial<Reservation>) => {
+  const { data, error } = await supabase
+    .from("reservations")
+    .insert([reservation])
+    .select()
+    .single();
+
+  return { data, error };
+};
+
+// Update reservation status or details
+export const updateReservationStatus = async (
+  reservationId: string,
+  status: string,
+  tableNumber?: string,
+  notes?: string
+) => {
+  const updateData: any = { status, updated_at: new Date().toISOString() };
+  if (tableNumber) updateData.table_number = tableNumber;
+  if (notes) updateData.notes = notes;
+
+  const { error } = await supabase
+    .from("reservations")
+    .update(updateData)
+    .eq("id", reservationId);
+
+  return !error;
+};
 
 export interface Promotion {
   id: string;
@@ -808,6 +914,88 @@ export const subscribeToInventory = (
       },
       () => {
         fetchInventory();
+      }
+    )
+    .subscribe();
+
+  return subscription;
+};
+
+// ==================== Delivery Zones ====================
+
+// Get all delivery zones for a restaurant
+export const getDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
+  const { data, error } = await supabase
+    .from("delivery_zones")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at");
+
+  if (error) {
+    console.error("Error fetching delivery zones:", error);
+    return [];
+  }
+
+  return data || [];
+};
+
+// Create a delivery zone
+export const createDeliveryZone = async (zone: Partial<DeliveryZone>) => {
+  const { data, error } = await supabase
+    .from("delivery_zones")
+    .insert([zone])
+    .select()
+    .single();
+
+  return { success: !error, data, error };
+};
+
+// Update a delivery zone
+export const updateDeliveryZone = async (zoneId: string, updates: Partial<DeliveryZone>) => {
+  const { data, error } = await supabase
+    .from("delivery_zones")
+    .update(updates)
+    .eq("id", zoneId)
+    .select()
+    .single();
+
+  return { success: !error, data, error };
+};
+
+// Delete a delivery zone
+export const deleteDeliveryZone = async (zoneId: string) => {
+  const { error } = await supabase
+    .from("delivery_zones")
+    .delete()
+    .eq("id", zoneId);
+
+  return !error;
+};
+
+// Subscribe to delivery zones
+export const subscribeToDeliveryZones = (
+  restaurantId: string,
+  callback: (zones: DeliveryZone[]) => void
+) => {
+  const fetchZones = async () => {
+    const zones = await getDeliveryZones(restaurantId);
+    callback(zones);
+  };
+
+  fetchZones();
+
+  const subscription = supabase
+    .channel(`restaurant-zones-${restaurantId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "delivery_zones",
+        filter: `restaurant_id=eq.${restaurantId}`,
+      },
+      () => {
+        fetchZones();
       }
     )
     .subscribe();
