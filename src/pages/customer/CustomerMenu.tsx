@@ -354,7 +354,7 @@ const CustomerMenu: React.FC = () => {
   });
 
   if (loading) return <Loading text={lang === "ar" ? "جاري تحميل المنيو..." : "Loading menu..."} />;
-  if (!restaurant) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Card className="p-8 text-center"><Package className="w-16 h-16 mx-auto mb-4 opacity-30" /><h2 className="text-xl font-bold">{tx.restaurantNotFound}</h2></Card></div>;
+  if (!restaurant) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Card className="p-8 text-center"><Package className="w-16 h-16 mx-auto mb-4 opacity-30" /><h2 className="text-xl font-bold">{tx.restaurantNotFoundDesc}</h2></Card></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20" dir={dir}>
@@ -472,7 +472,7 @@ const CustomerMenu: React.FC = () => {
 
       <div className="bg-white border-b sticky top-[108px] z-30">
         <div className="max-w-screen-lg mx-auto px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
-          {categoriesList.map(c => <button key={c} onClick={() => setCategoryFilter(c)} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${categoryFilter === c ? "bg-accent text-white" : "bg-gray-100 text-gray-600"}`}>{c === "all" ? tx.all : c}</button>)}
+          {categoriesList.map(c => <button key={c} onClick={() => c && setCategoryFilter(c)} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${categoryFilter === c ? "bg-accent text-white" : "bg-gray-100 text-gray-600"}`}>{c === "all" ? tx.all : c}</button>)}
         </div>
       </div>
 
@@ -500,7 +500,7 @@ const CustomerMenu: React.FC = () => {
         })}
       </div>
 
-      {cartCount > 0 && <div className="fixed bottom-6 left-4 right-4 z-50"><button onClick={() => setShowCart(true)} className="w-full max-w-screen-lg mx-auto flex items-center justify-between bg-accent text-white rounded-2xl px-6 py-4 shadow-xl shadow-accent/40 font-bold"><span>{cartCount} {lang === "ar" ? "أصناف" : "Items"} - {formatCurrency(cart.reduce((s,i) => s + i.itemTotal * i.quantity, 0))}</span><div className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /><span>{tx.viewCart}</span></div></button></div>}
+      {cartCount > 0 && <div className="fixed bottom-6 left-4 right-4 z-50"><button onClick={() => setShowCart(true)} className="w-full max-w-screen-lg mx-auto flex items-center justify-between bg-accent text-white rounded-2xl px-6 py-4 shadow-xl shadow-accent/40 font-bold"><span>{cartCount} {lang === "ar" ? "أصناف" : "Items"} - {formatCurrency(cart.reduce((s: number, i: any) => s + i.itemTotal * i.quantity, 0))}</span><div className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /><span>{tx.viewCart}</span></div></button></div>}
 
       <CartModal isOpen={showCart} cart={cart} lang={lang} tx={tx} onClose={() => setShowCart(false)} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} isRestaurantOpen={isOpen} onCheckout={() => { setShowCart(false); setShowCheckout(true); }} />
       <ItemCustomizationModal isOpen={showItemModal} item={selectedItem} lang={lang} tx={tx} menuItems={menuItems} isRestaurantOpen={isOpen} onClose={() => setShowItemModal(false)} onAdd={addToCart} />
@@ -520,12 +520,12 @@ const CustomerMenu: React.FC = () => {
 
 const CartModal: React.FC<{ isOpen: boolean; cart: CartItem[]; lang: Lang; tx: any; onClose: () => void; onUpdateQuantity: (i: number, d: number) => void; onRemove: (i: number) => void; onCheckout: () => void; isRestaurantOpen: boolean; }> = 
 ({ isOpen, cart, lang, tx, onClose, onUpdateQuantity, onRemove, onCheckout, isRestaurantOpen }) => {
-  const total = cart.reduce((sum, item) => sum + item.itemTotal * item.quantity, 0);
+  const total = cart.reduce((sum: number, item: any) => sum + item.itemTotal * item.quantity, 0);
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={tx.cartTitle} size="lg">
       <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
         {cart.length === 0 ? <div className="text-center py-10"><ShoppingCart className="w-12 h-12 text-gray-200 mx-auto mb-2" /><p className="text-gray-400">{tx.cartEmpty}</p></div> : 
-        <><div className="space-y-3 max-h-80 overflow-y-auto">{cart.map((item, i) => <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"><div className="flex-1"><h4 className="font-semibold text-sm">{getItemName(item, lang)}</h4><p className="text-accent font-bold text-xs">{formatCurrency(item.itemTotal)}</p></div><div className="flex items-center gap-2"><button onClick={() => onUpdateQuantity(i, -1)} className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><Minus className="w-3 h-3" /></button><span className="font-bold text-sm">{item.quantity}</span><button onClick={() => onUpdateQuantity(i, 1)} className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><Plus className="w-3 h-3" /></button></div><button onClick={() => onRemove(i)} className="text-red-400"><X className="w-4 h-4" /></button></div>)}</div><div className="border-t pt-4 flex justify-between font-bold text-lg mb-4"><span>{tx.total}</span><span>{formatCurrency(total)}</span></div><Button onClick={onCheckout} fullWidth disabled={!isRestaurantOpen}>{!isRestaurantOpen ? tx.restaurantClosed : tx.checkout}</Button></>}
+        <><div className="space-y-3 max-h-80 overflow-y-auto">{cart.map((item: any, i: number) => <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"><div className="flex-1"><h4 className="font-semibold text-sm">{getItemName(item, lang)}</h4><p className="text-accent font-bold text-xs">{formatCurrency(item.itemTotal)}</p></div><div className="flex items-center gap-2"><button onClick={() => onUpdateQuantity(i, -1)} className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><Minus className="w-3 h-3" /></button><span className="font-bold text-sm">{item.quantity}</span><button onClick={() => onUpdateQuantity(i, 1)} className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center"><Plus className="w-3 h-3" /></button></div><button onClick={() => onRemove(i)} className="text-red-400"><X className="w-4 h-4" /></button></div>)}</div><div className="border-t pt-4 flex justify-between font-bold text-lg mb-4"><span>{tx.total}</span><span>{formatCurrency(total)}</span></div><Button onClick={onCheckout} fullWidth disabled={!isRestaurantOpen}>{!isRestaurantOpen ? tx.restaurantClosed : tx.checkout}</Button></>}
       </div>
     </Modal>
   );
@@ -538,7 +538,7 @@ const ItemCustomizationModal: React.FC<{ isOpen: boolean; item: MenuItem | null;
   useEffect(() => { if (item?.sizes?.length) setSize(item.sizes[0]); setAddons([]); }, [item]);
   if (!item) return null;
   const toggleAddon = (a: any) => setAddons(addons.find(x => x.name === a.name) ? addons.filter(x => x.name !== a.name) : [...addons, a]);
-  const total = (size ? size.price : item.base_price) + addons.reduce((s, a) => s + a.price, 0);
+  const total = (size ? size.price : item.base_price) + addons.reduce((s: number, a: any) => s + a.price, 0);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={getItemName(item, lang)}>
@@ -561,7 +561,7 @@ const RecommendationsModal: React.FC<{ isOpen: boolean; recommendations: MenuIte
     <Modal isOpen={isOpen} onClose={onClose} title={tx.recommendations} size="lg">
       <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
         <p className="text-center text-gray-500 text-sm">{lang === 'ar' ? `أضفت ${getItemName(lastAddedItem, lang)} للسلة. نقترح لك أيضاً:` : `Added ${getItemName(lastAddedItem, lang)}. You might also like:`}</p>
-        <div className="space-y-2">{recommendations.map(item => <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"><div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">{item.image_url ? <LazyImage src={item.image_url} alt="" width={100} quality={50} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-4 text-gray-400" />}</div><div className="flex-1"><h4 className="font-bold text-sm">{getItemName(item, lang)}</h4><p className="text-accent text-xs">{formatCurrency(item.base_price)}</p></div><Button size="sm" onClick={() => { onAddRecommendation(item); setAdded(new Set([...added, item.id])); }} disabled={added.has(item.id)}>{added.has(item.id) ? "✓" : tx.add}</Button></div>)}</div>
+        <div className="space-y-2">{recommendations.map((item: any) => <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"><div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">{item.image_url ? <LazyImage src={item.image_url} alt="" width={100} quality={50} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-4 text-gray-400" />}</div><div className="flex-1"><h4 className="font-bold text-sm">{getItemName(item, lang)}</h4><p className="text-accent text-xs">{formatCurrency(item.base_price)}</p></div><Button size="sm" onClick={() => { onAddRecommendation(item); setAdded(new Set([...added, item.id])); }} disabled={added.has(item.id)}>{added.has(item.id) ? "✓" : tx.add}</Button></div>)}</div>
         <div className="flex gap-2 pt-2"><Button onClick={onContinueToCart} fullWidth>{tx.continueToCart}</Button><Button variant="outline" onClick={onClose} fullWidth>{tx.skip}</Button></div>
       </div>
     </Modal>
@@ -588,7 +588,7 @@ const CheckoutModal: React.FC<any> = ({ isOpen, cart, lang, tx, restaurant, orde
     } 
   }, [isOpen, orderTypesEnabled, paymentSettings]);
 
-  const subtotal = cart.reduce((s, i) => s + i.itemTotal * i.quantity, 0);
+  const subtotal = cart.reduce((s: number, i: any) => s + i.itemTotal * i.quantity, 0);
   const deliveryFee = type === "delivery" && selectedZone ? selectedZone.delivery_fee : 0;
   const total = subtotal + deliveryFee;
 
@@ -598,11 +598,11 @@ const CheckoutModal: React.FC<any> = ({ isOpen, cart, lang, tx, restaurant, orde
     setLoading(true);
     const orderData = {
       restaurant_id: restaurant.id,
-      order_type: (type === "dine_in" ? "qr" : type === "takeaway" ? "counter" : "phone"),
+      order_type: (type === "dine_in" ? "qr" : type === "takeaway" ? "counter" : "phone") as "table" | "qr" | "counter" | "phone",
       table_number: type === "dine_in" ? table : undefined,
       customer_name: name,
       customer_phone: phone,
-      items: cart.map(i => ({ 
+      items: cart.map((i: any) => ({ 
         menu_item_id: i.id, 
         name: getItemName(i, 'en'), 
         name_ar: getItemName(i, 'ar'),
@@ -646,11 +646,11 @@ const CheckoutModal: React.FC<any> = ({ isOpen, cart, lang, tx, restaurant, orde
           <Select 
             label={tx.selectZone} 
             value={selectedZone?.id || ""} 
-            onChange={(e) => setSelectedZone(deliveryZones.find(z => z.id === e.target.value))}
+            onChange={(e) => setSelectedZone(deliveryZones.find((z: any) => z.id === e.target.value))}
             required
           >
             <option value="">{tx.selectZone}</option>
-            {deliveryZones.map(zone => (
+            {deliveryZones.map((zone: any) => (
               <option key={zone.id} value={zone.id}>
                 {lang === "ar" ? zone.name_ar : zone.name_en} ({formatCurrency(zone.delivery_fee)})
               </option>
